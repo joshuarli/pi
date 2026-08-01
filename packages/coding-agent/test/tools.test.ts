@@ -185,7 +185,7 @@ describe("Coding Agent Tools", () => {
 			expect(result.details?.truncation?.outputLines).toBe(2000);
 		});
 
-		it("should detect image MIME type from file magic (not extension)", async () => {
+		it("should detect image MIME type from file magic (not extension) and omit the attachment", async () => {
 			const png1x1Base64 =
 				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==";
 			const pngBuffer = Buffer.from(png1x1Base64, "base64");
@@ -197,32 +197,20 @@ describe("Coding Agent Tools", () => {
 
 			expect(result.content[0]?.type).toBe("text");
 			expect(getTextOutput(result)).toContain("Read image file [image/png]");
-
-			const imageBlock = result.content.find(
-				(c): c is { type: "image"; mimeType: string; data: string } => c.type === "image",
-			);
-			expect(imageBlock).toBeDefined();
-			expect(imageBlock?.mimeType).toBe("image/png");
-			expect(typeof imageBlock?.data).toBe("string");
-			expect((imageBlock?.data ?? "").length).toBeGreaterThan(0);
+			expect(getTextOutput(result)).toContain("Image omitted");
+			expect(result.content.some((c) => c.type === "image")).toBe(false);
 		});
 
-		it("should read BMP files from disk as PNG image attachments", async () => {
+		it("should omit BMP files from disk (no conversion without Photon)", async () => {
 			const testFile = join(testDir, "image.bmp");
 			writeFileSync(testFile, createTinyBmp1x1Red24bpp());
 
 			const result = await readTool.execute("test-call-img-bmp", { path: testFile });
 
 			expect(result.content[0]?.type).toBe("text");
-			expect(getTextOutput(result)).toContain("Read image file [image/png]");
-			expect(getTextOutput(result)).toContain("[Image converted from image/bmp to image/png.]");
-
-			const imageBlock = result.content.find(
-				(c): c is { type: "image"; mimeType: string; data: string } => c.type === "image",
-			);
-			expect(imageBlock).toBeDefined();
-			expect(imageBlock?.mimeType).toBe("image/png");
-			expect(Buffer.from(imageBlock?.data ?? "", "base64")[0]).toBe(0x89);
+			expect(getTextOutput(result)).toContain("Read image file [image/bmp]");
+			expect(getTextOutput(result)).toContain("Image omitted");
+			expect(result.content.some((c) => c.type === "image")).toBe(false);
 		});
 
 		it("should treat files with image extension but non-image content as text", async () => {

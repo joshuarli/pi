@@ -14,11 +14,7 @@ export interface InitialMessageResult {
  * Combine stdin content, @file text, and the first CLI message into a single
  * initial prompt for non-interactive mode.
  */
-export function buildInitialMessage({
-	parsed,
-	fileText,
-	stdinContent,
-}: InitialMessageInput): InitialMessageResult {
+export function buildInitialMessage({ parsed, fileText, stdinContent }: InitialMessageInput): InitialMessageResult {
 	const parts: string[] = [];
 	if (stdinContent !== undefined) {
 		parts.push(stdinContent);

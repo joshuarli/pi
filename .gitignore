@@ -11,6 +11,7 @@ packages/*/dist-firefox/
 packages/ai/src/providers/data/
 packages/ai/src/providers/.model-generation-*/
 packages/coding-agent/src/embedded-assets.generated.ts
+packages/coding-agent/src/version.generated.ts
 *.cpuprofile
 
 # Environment
