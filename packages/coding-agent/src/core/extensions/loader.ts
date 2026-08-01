@@ -21,7 +21,7 @@ import { createJiti } from "jiti/static";
 import * as _bundledTypebox from "typebox";
 import * as _bundledTypeboxCompile from "typebox/compile";
 import * as _bundledTypeboxValue from "typebox/value";
-import { CONFIG_DIR_NAME, getAgentDir, isBunBinary } from "../../config.ts";
+import { CONFIG_DIR_NAME, getAgentDir, isBunBinary, isStandaloneBinary } from "../../config.ts";
 // NOTE: This import works because loader.ts exports are NOT re-exported from index.ts,
 // avoiding a circular dependency. Extensions can import from @earendil-works/pi-coding-agent.
 import * as _bundledPiCodingAgent from "../../index.ts";
@@ -46,7 +46,7 @@ import type {
 	ToolDefinition,
 } from "./types.ts";
 
-/** Modules available to extensions via virtualModules (for compiled Bun binary) */
+/** Modules available to extensions via virtualModules (for compiled standalone binaries) */
 const VIRTUAL_MODULES: Record<string, unknown> = {
 	typebox: _bundledTypebox,
 	"typebox/compile": _bundledTypeboxCompile,
@@ -443,9 +443,10 @@ async function loadExtensionModule(extensionPath: string, cacheToken?: Extension
 
 	const jiti = createJiti(import.meta.url, {
 		moduleCache: false,
-		// Bun uses modules embedded in the executable. Source TypeScript reuses the
-		// host-resolved modules and root tsconfig paths. Built Node uses dist aliases.
-		...(isBunBinary
+		// Standalone binaries use modules embedded in the executable. Source
+		// TypeScript reuses the host-resolved modules and root tsconfig paths.
+		// Built Node uses dist aliases.
+		...(isStandaloneBinary
 			? { virtualModules: VIRTUAL_MODULES, tryNative: false }
 			: isTypeScriptSourceRuntime
 				? { virtualModules: VIRTUAL_MODULES, tsconfigPaths: true }

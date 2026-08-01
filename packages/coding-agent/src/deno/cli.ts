@@ -8,9 +8,9 @@ process.emitWarning = (() => {}) as typeof process.emitWarning;
 
 registerBunOAuthFlows();
 
-import { restoreSandboxEnv } from "./restore-sandbox-env.ts";
+import { restoreSandboxEnv } from "../bun/restore-sandbox-env.ts";
 
 restoreSandboxEnv();
 
-await import("./register-bedrock.ts");
+await import("../bun/register-bedrock.ts");
 await import("../cli.ts");
