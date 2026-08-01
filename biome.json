@@ -33,6 +33,7 @@
 			"!**/node_modules/**/*",
 			"!**/test-sessions.ts",
 			"!**/models.generated.ts",
+			"!**/embedded-assets.generated.ts",
 			"!**/*.models.ts",
 			"!packages/mom/data/**/*",
 			"!!**/node_modules"

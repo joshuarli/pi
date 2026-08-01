@@ -22,6 +22,13 @@ export const isBunBinary =
 /** Detect if Bun is the runtime (compiled binary or bun run) */
 export const isBunRuntime = !!process.versions.bun;
 
+/**
+ * Detect a compiled standalone binary (Bun or Deno). Unlike the Node/tsx
+ * layouts, standalone binaries resolve package assets from a single directory
+ * (see getPackageDir). standalone-assets.ts sets PI_STANDALONE_BINARY.
+ */
+export const isStandaloneBinary = isBunBinary || process.env.PI_STANDALONE_BINARY === "1";
+
 // =============================================================================
 // Install Method Detection
 // =============================================================================
@@ -394,7 +401,7 @@ export function getPackageDir(): string {
  * - For tsx (src/): src/modes/interactive/theme/
  */
 export function getThemesDir(): string {
-	if (isBunBinary) {
+	if (isStandaloneBinary) {
 		return join(getPackageDir(), "theme");
 	}
 	// Theme is in modes/interactive/theme/ relative to src/ or dist/
@@ -410,7 +417,7 @@ export function getThemesDir(): string {
  * - For tsx (src/): src/core/export-html/
  */
 export function getExportTemplateDir(): string {
-	if (isBunBinary) {
+	if (isStandaloneBinary) {
 		return join(getPackageDir(), "export-html");
 	}
 	const packageDir = getPackageDir();
@@ -450,7 +457,7 @@ export function getChangelogPath(): string {
  * - For tsx (src/): src/modes/interactive/assets/
  */
 export function getInteractiveAssetsDir(): string {
-	if (isBunBinary) {
+	if (isStandaloneBinary) {
 		return join(getPackageDir(), "assets");
 	}
 	const packageDir = getPackageDir();
