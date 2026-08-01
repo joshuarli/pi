@@ -44,11 +44,17 @@ function pathOrNull(file: PathOrFileDescriptor): string | null {
 
 function getFallbackWasmPaths(): string[] {
 	const execDir = path.dirname(process.execPath);
-	return [
+	const paths = [
 		path.join(execDir, WASM_FILENAME),
 		path.join(execDir, "photon", WASM_FILENAME),
 		path.join(process.cwd(), WASM_FILENAME),
 	];
+	// Standalone binaries extract the WASM to the package directory.
+	const packageDir = process.env.PI_PACKAGE_DIR;
+	if (packageDir) {
+		paths.push(path.join(packageDir, WASM_FILENAME));
+	}
+	return paths;
 }
 
 function patchPhotonWasmRead(): () => void {

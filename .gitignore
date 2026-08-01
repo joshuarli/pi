@@ -10,6 +10,7 @@ packages/*/dist-chrome/
 packages/*/dist-firefox/
 packages/ai/src/providers/data/
 packages/ai/src/providers/.model-generation-*/
+packages/coding-agent/src/embedded-assets.generated.ts
 *.cpuprofile
 
 # Environment
