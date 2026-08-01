@@ -44,7 +44,6 @@ export interface TerminalSettings {
 }
 
 export interface ImageSettings {
-	autoResize?: boolean; // default: true (resize images to 2000x2000 max for better model compatibility)
 	blockImages?: boolean; // default: false - when true, prevents all images from being sent to LLM providers
 }
 
@@ -1155,19 +1154,6 @@ export class SettingsManager {
 	setFullscreenScrollbar(mode: ScrollViewScrollbar): void {
 		this.globalSettings.fullscreenScrollbar = mode;
 		this.markModified("fullscreenScrollbar");
-		this.save();
-	}
-
-	getImageAutoResize(): boolean {
-		return this.settings.images?.autoResize ?? true;
-	}
-
-	setImageAutoResize(enabled: boolean): void {
-		if (!this.globalSettings.images) {
-			this.globalSettings.images = {};
-		}
-		this.globalSettings.images.autoResize = enabled;
-		this.markModified("images", "autoResize");
 		this.save();
 	}
 

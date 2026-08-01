@@ -30,8 +30,6 @@ pi
 
 Clipboard operations use `termux-clipboard-set` and `termux-clipboard-get` when running in Termux. The Termux:API app must be installed for these to work.
 
-Image clipboard is not supported on Termux (the `ctrl+v` image paste feature will not work).
-
 ## Example AGENTS.md for Termux
 
 Create `~/.pi/agent/AGENTS.md` to help the agent understand the Termux environment:

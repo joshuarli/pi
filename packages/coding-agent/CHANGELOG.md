@@ -156,6 +156,10 @@
 - Added inherited optional cancellation to pi-ai `ModelsStore` reads, writes, and deletions; catalog orchestration binds these waits to the provider refresh signal.
 - Reduced the inherited default fullscreen mouse wheel step from three lines to one for finer scrolling.
 
+### Removed
+
+- Removed clipboard image pasting, the Photon WASM image processing dependency, and the `images.autoResize` setting. Inline image attachments are now refused (`read` and `@file` report them as omitted); Ctrl+V pastes plain text.
+
 ### Fixed
 
 - Fixed the footer showing `(sub)` for generic OAuth/OpenID sign-ins without a known subscription; extension OAuth providers can opt in with `isSubscription`.
