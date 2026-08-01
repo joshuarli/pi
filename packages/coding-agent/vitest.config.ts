@@ -14,11 +14,6 @@ export default mergeConfig(
 			unstubEnvs: true,
 			reporters: process.env.GITHUB_ACTIONS ? ["dot", "github-actions"] : ["dot"],
 			silent: "passed-only",
-			server: {
-				deps: {
-					external: [/@silvia-odwyer\/photon-node/],
-				},
-			},
 		},
 		resolve: {
 			alias: [

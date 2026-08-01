@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => {
 		execSync: vi.fn(),
 		spawn: vi.fn(),
 		platform: vi.fn<() => NodeJS.Platform>(),
-		isWaylandSession: vi.fn<() => boolean>(),
 	};
 });
 
@@ -37,12 +36,6 @@ vi.mock("os", () => {
 	};
 });
 
-vi.mock("../src/utils/clipboard-image.js", () => {
-	return {
-		isWaylandSession: mocks.isWaylandSession,
-	};
-});
-
 const mockedExecFileSync = vi.mocked(execFileSync);
 const mockedExecSync = vi.mocked(execSync);
 const mockedSpawn = vi.mocked(spawn);
@@ -61,6 +54,8 @@ beforeEach(() => {
 	vi.stubEnv("SSH_CONNECTION", "");
 	vi.stubEnv("SSH_CLIENT", "");
 	vi.stubEnv("MOSH_CONNECTION", "");
+	vi.stubEnv("WAYLAND_DISPLAY", "");
+	vi.stubEnv("XDG_SESSION_TYPE", "");
 	stdoutWrites = [];
 	nativeResolved = false;
 	mocks.clipboard.getText.mockReset();
@@ -69,9 +64,7 @@ beforeEach(() => {
 	mocks.execSync.mockReset();
 	mocks.spawn.mockReset();
 	mocks.platform.mockReset();
-	mocks.isWaylandSession.mockReset();
 	mockedPlatform.mockReturnValue("darwin");
-	mocks.isWaylandSession.mockReturnValue(false);
 	mocks.clipboard.getText.mockResolvedValue("");
 	mocks.clipboard.setText.mockImplementation(async () => {
 		await new Promise((resolve) => setTimeout(resolve, 1));
@@ -103,7 +96,6 @@ describe("readClipboardText", () => {
 	test("reads the Wayland clipboard before the stale native X11 clipboard", async () => {
 		// Regression test for #7248.
 		mockedPlatform.mockReturnValue("linux");
-		mocks.isWaylandSession.mockReturnValue(true);
 		vi.stubEnv("WAYLAND_DISPLAY", "wayland-0");
 		mockedExecFileSync.mockReturnValue("Wayland text");
 		mocks.clipboard.getText.mockResolvedValue("stale X11 text");
@@ -119,7 +111,6 @@ describe("readClipboardText", () => {
 
 	test("does not fall back to stale X11 text when the Wayland clipboard is empty", async () => {
 		mockedPlatform.mockReturnValue("linux");
-		mocks.isWaylandSession.mockReturnValue(true);
 		vi.stubEnv("WAYLAND_DISPLAY", "wayland-0");
 		mockedExecFileSync.mockReturnValue("");
 		mocks.clipboard.getText.mockResolvedValue("stale X11 text");
@@ -130,7 +121,6 @@ describe("readClipboardText", () => {
 
 	test("falls back to the native clipboard when wl-paste is unavailable", async () => {
 		mockedPlatform.mockReturnValue("linux");
-		mocks.isWaylandSession.mockReturnValue(true);
 		vi.stubEnv("WAYLAND_DISPLAY", "wayland-0");
 		mockedExecFileSync.mockImplementation(() => {
 			throw new Error("wl-paste unavailable");

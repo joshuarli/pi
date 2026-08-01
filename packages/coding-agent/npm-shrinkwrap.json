@@ -14,7 +14,6 @@
 				"@earendil-works/pi-client": "^0.84.0",
 				"@earendil-works/pi-protocol": "^0.84.0",
 				"@earendil-works/pi-tui": "^0.84.0",
-				"@silvia-odwyer/photon-node": "0.3.4",
 				"chalk": "5.6.2",
 				"cross-spawn": "7.0.6",
 				"diff": "8.0.4",
@@ -869,12 +868,6 @@
 			"integrity": "sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==",
 			"license": "BSD-3-Clause"
 		},
-		"node_modules/@silvia-odwyer/photon-node": {
-			"version": "0.3.4",
-			"resolved": "https://registry.npmjs.org/@silvia-odwyer/photon-node/-/photon-node-0.3.4.tgz",
-			"integrity": "sha512-bnly4BKB3KDTFxrUIcgCLbaeVVS8lrAkri1pEzskpmxu9MdfGQTy8b8EgcD83ywD3RPMsIulY8xJH5Awa+t9fA==",
-			"license": "Apache-2.0"
-		},
 		"node_modules/@smithy/core": {
 			"version": "3.24.3",
 			"resolved": "https://registry.npmjs.org/@smithy/core/-/core-3.24.3.tgz",
@@ -958,9 +951,9 @@
 			}
 		},
 		"node_modules/@smithy/types": {
-			"version": "4.14.2",
-			"resolved": "https://registry.npmjs.org/@smithy/types/-/types-4.14.2.tgz",
-			"integrity": "sha512-P+otAxbV4CqBybp7EkcJCrig63yE2E7PuNVOmilVMRcx/O+QDzGULTrKsq4DV13gSfak9ObPrWaHl/9bL5YcWw==",
+			"version": "4.16.1",
+			"resolved": "https://registry.npmjs.org/@smithy/types/-/types-4.16.1.tgz",
+			"integrity": "sha512-0JFs3V2y2M9tKW5na/qxe69Zv+uxLMO7QBbhxF/FHu/Gp2NFZAAL9tWl9PU02xxo07pb3G9FTyjNc6D5uZrJIg==",
 			"license": "Apache-2.0",
 			"dependencies": {
 				"tslib": "^2.6.2"

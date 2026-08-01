@@ -6,7 +6,7 @@
  */
 
 import { createInterface } from "node:readline";
-import { type ImageContent, modelsAreEqual } from "@earendil-works/pi-ai";
+import { modelsAreEqual } from "@earendil-works/pi-ai";
 import chalk from "chalk";
 import { type Args, type Mode, parseArgs, printHelp } from "./cli/args.ts";
 import {
@@ -176,21 +176,16 @@ async function runCredentialPrintCommand(args: string[]): Promise<boolean> {
 
 async function prepareInitialMessage(
 	parsed: Args,
-	autoResizeImages: boolean,
 	stdinContent?: string,
-): Promise<{
-	initialMessage?: string;
-	initialImages?: ImageContent[];
-}> {
+): Promise<{ initialMessage?: string }> {
 	if (parsed.fileArgs.length === 0) {
 		return buildInitialMessage({ parsed, stdinContent });
 	}
 
-	const { text, images } = await processFileArguments(parsed.fileArgs, { autoResizeImages });
+	const { text } = await processFileArguments(parsed.fileArgs);
 	return buildInitialMessage({
 		parsed,
 		fileText: text,
-		fileImages: images,
 		stdinContent,
 	});
 }
@@ -835,11 +830,7 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 	time("readPipedStdin");
 
-	const { initialMessage, initialImages } = await prepareInitialMessage(
-		parsed,
-		settingsManager.getImageAutoResize(),
-		stdinContent,
-	);
+	const { initialMessage } = await prepareInitialMessage(parsed, stdinContent);
 	time("prepareInitialMessage");
 	initTheme(settingsManager.getTheme(), appMode === "interactive");
 	time("initTheme");
@@ -889,7 +880,6 @@ export async function main(args: string[], options?: MainOptions) {
 			modelFallbackMessage,
 			autoTrustOnReloadCwd,
 			initialMessage,
-			initialImages,
 			initialMessages: parsed.messages,
 			verbose: parsed.verbose,
 			tuiMode: parsed.tuiMode,
@@ -920,7 +910,6 @@ export async function main(args: string[], options?: MainOptions) {
 			mode: toPrintOutputMode(appMode),
 			messages: parsed.messages,
 			initialMessage,
-			initialImages,
 		});
 		stopThemeWatcher();
 		restoreStdout();

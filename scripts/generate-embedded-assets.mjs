@@ -3,7 +3,7 @@
 // Generate packages/coding-agent/src/embedded-assets.generated.ts.
 //
 // Standalone binaries (make bun / make deno) read theme, export-html, docs,
-// examples, README, CHANGELOG, package.json, and the photon WASM from an
+// examples, README, CHANGELOG, and package.json from an
 // extraction directory rather than from files shipped next to the executable.
 // This script inlines those files into a generated module that the runtime
 // (src/standalone-assets.ts) extracts to a cache directory at startup.
@@ -13,16 +13,10 @@
 
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "../packages/coding-agent");
 const outputPath = join(packageDir, "src", "embedded-assets.generated.ts");
-
-// Resolve @silvia-odwyer/photon-node from the coding-agent package so the WASM
-// is found regardless of whether it is hoisted to the workspace root.
-const packageRequire = createRequire(join(packageDir, "package.json"));
-const photonDir = dirname(packageRequire.resolve("@silvia-odwyer/photon-node/package.json"));
 
 // Relative path under the package root -> path on disk. Keys are written
 // verbatim into the extracted layout used by standalone binaries.
@@ -30,7 +24,6 @@ const inputs = [
 	["package.json", join(packageDir, "package.json")],
 	["README.md", join(packageDir, "README.md")],
 	["CHANGELOG.md", join(packageDir, "CHANGELOG.md")],
-	["photon_rs_bg.wasm", join(photonDir, "photon_rs_bg.wasm")],
 	...collectDir("theme", join(packageDir, "src/modes/interactive/theme")),
 	...collectDir("export-html", join(packageDir, "src/core/export-html")),
 	...collectDir("docs", join(packageDir, "docs")),

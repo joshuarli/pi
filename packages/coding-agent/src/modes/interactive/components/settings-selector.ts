@@ -59,7 +59,6 @@ export interface SettingsConfig {
 	autoCompact: boolean;
 	showImages: boolean;
 	imageWidthCells: number;
-	autoResizeImages: boolean;
 	blockImages: boolean;
 	enableSkillCommands: boolean;
 	steeringMode: "all" | "one-at-a-time";
@@ -95,7 +94,6 @@ export interface SettingsCallbacks {
 	onAutoCompactChange: (enabled: boolean) => void;
 	onShowImagesChange: (enabled: boolean) => void;
 	onImageWidthCellsChange: (width: number) => void;
-	onAutoResizeImagesChange: (enabled: boolean) => void;
 	onBlockImagesChange: (blocked: boolean) => void;
 	onEnableSkillCommandsChange: (enabled: boolean) => void;
 	onSteeringModeChange: (mode: "all" | "one-at-a-time") => void;
@@ -672,18 +670,8 @@ export class SettingsSelectorComponent extends Container {
 			});
 		}
 
-		// Image auto-resize toggle (always available, affects both attached and read images)
+		// Block images toggle (always available; insert after the image toggles)
 		items.splice(supportsImages ? 3 : 1, 0, {
-			id: "auto-resize-images",
-			label: "Auto-resize images",
-			description: "Resize large images to 2000x2000 max for better model compatibility",
-			currentValue: config.autoResizeImages ? "true" : "false",
-			values: ["true", "false"],
-		});
-
-		// Block images toggle (always available, insert after auto-resize-images)
-		const autoResizeIndex = items.findIndex((item) => item.id === "auto-resize-images");
-		items.splice(autoResizeIndex + 1, 0, {
 			id: "block-images",
 			label: "Block images",
 			description: "Prevent images from being sent to LLM providers",
@@ -778,9 +766,6 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "image-width-cells":
 						callbacks.onImageWidthCellsChange(parseInt(newValue, 10));
-						break;
-					case "auto-resize-images":
-						callbacks.onAutoResizeImagesChange(newValue === "true");
 						break;
 					case "block-images":
 						callbacks.onBlockImagesChange(newValue === "true");

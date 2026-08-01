@@ -121,6 +121,10 @@
 - Added inherited optional cancellation to pi-ai `ModelsStore` reads, writes, and deletions; catalog orchestration binds these waits to the provider refresh signal.
 - Reduced the inherited default fullscreen mouse wheel step from three lines to one for finer scrolling.
 
+### Removed
+
+- Removed clipboard image pasting, the Photon WASM image processing dependency, and the `images.autoResize` setting. Inline image attachments are now refused (`read` and `@file` report them as omitted); Ctrl+V pastes plain text.
+
 ### Fixed
 
 - Fixed Bun standalone binaries crashing on startup when the cwd contains a `bunfig.toml` with `preload` by compiling with `--no-compile-autoload-bunfig` ([#7684](https://github.com/earendil-works/pi/issues/7684)).
