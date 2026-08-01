@@ -166,10 +166,7 @@ async function runCredentialPrintCommand(args: string[]): Promise<boolean> {
 	return true;
 }
 
-async function prepareInitialMessage(
-	parsed: Args,
-	stdinContent?: string,
-): Promise<{ initialMessage?: string }> {
+async function prepareInitialMessage(parsed: Args, stdinContent?: string): Promise<{ initialMessage?: string }> {
 	if (parsed.fileArgs.length === 0) {
 		return buildInitialMessage({ parsed, stdinContent });
 	}

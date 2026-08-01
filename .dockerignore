@@ -1,0 +1,10 @@
+# Docker build context for Dockerfile.bun. Keep the context small and exclude
+# host build output; the container rebuilds everything from source.
+.git
+node_modules
+**/node_modules
+**/dist
+packages/coding-agent/binaries
+**/.pi
+*.log
+.DS_Store

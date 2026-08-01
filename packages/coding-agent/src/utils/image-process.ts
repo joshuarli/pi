@@ -6,5 +6,4 @@
  * provider limits. Both the read tool and @file CLI argument handling emit
  * this message in place of an image attachment.
  */
-export const IMAGE_ATTACHMENT_REFUSED_MESSAGE =
-	"[Image omitted: inline image attachments are not supported.]";
+export const IMAGE_ATTACHMENT_REFUSED_MESSAGE = "[Image omitted: inline image attachments are not supported.]";

@@ -1,0 +1,63 @@
+# Builder image for cross-compiling the pi bun binary for linux-arm64
+# (`make bun-linux-arm64`, and `make bun-linux-arm64-musl` for the musl
+# variant used by Alpine-based environments). Deno is out of scope.
+#
+# Vanilla Alpine Linux (latest stable) with the Bun binary downloaded directly
+# from GitHub releases (no npm package). The workspace is copied in,
+# dependencies are installed with npm, the workspace is built offline
+# (checked-in model data), and `bun build --compile --target=bun-linux-arm64`
+# produces the standalone binary. The Makefile targets run this image with a
+# named volume at /artifacts (no bind mounts) and extract the binary to the
+# host.
+FROM alpine:3.24
+
+# Alpine 3.24 ships Node 24.x. The workspace builds run .ts scripts directly
+# (e.g. `node scripts/check-model-data.ts`), which requires Node >= 23.6 type
+# stripping. gcompat + libstdc++ let the glibc Bun build run on Alpine; no
+# dependency lifecycle scripts run (npm ci --ignore-scripts).
+RUN apk add --no-cache nodejs npm git curl unzip gcompat libstdc++
+
+WORKDIR /app
+COPY . .
+
+# Install workspace dependencies and build all packages offline. This stays
+# before the Bun download/compile steps so Bun flavor changes reuse the cached
+# dependency and build layers.
+RUN npm ci --ignore-scripts \
+    && npm run build:offline
+
+# Direct Bun binary download. Bun 1.3.14 ships glibc (bun-linux-x64.zip /
+# bun-linux-aarch64.zip) and musl (bun-linux-x64-musl.zip /
+# bun-linux-aarch64-musl.zip) builds; gcompat makes the glibc build run on
+# Alpine. The arch follows the container's build platform (TARGETARCH). The
+# compile target fixes the output architecture to linux-arm64; the embedded
+# runtime follows the Bun flavor (glibc default, musl when BUN_FLAVOR=musl).
+ARG TARGETARCH
+ARG BUN_VERSION=1.3.14
+ARG BUN_FLAVOR=
+RUN case "$TARGETARCH" in \
+        arm64) BUN_ARCH=aarch64 ;; \
+        *)     BUN_ARCH=x64 ;; \
+    esac; \
+    flavor_suffix=; \
+    if test -n "$BUN_FLAVOR"; then flavor_suffix="-musl"; fi; \
+    curl -fsSL -o /tmp/bun.zip \
+        "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${BUN_ARCH}${flavor_suffix}.zip" \
+    && unzip -o /tmp/bun.zip -d /tmp/bun \
+    && mv "/tmp/bun/bun-linux-${BUN_ARCH}${flavor_suffix}/bun" /usr/local/bin/bun \
+    && chmod +x /usr/local/bin/bun \
+    && rm -rf /tmp/bun /tmp/bun.zip
+
+# Cross-compile the standalone binary (matches the local `make bun` invocation
+# with --target=bun-linux-arm64). Also stage a copy at a fixed path so the
+# runtime command below does not depend on build ARGs.
+ARG OUTPUT_DIR=packages/coding-agent/binaries/linux-arm64
+RUN mkdir -p "$OUTPUT_DIR" \
+    && cd packages/coding-agent \
+    && bun build --compile --target=bun-linux-arm64 ./dist/bun/cli.js \
+        --outfile "/app/$OUTPUT_DIR/pi-bun" \
+    && cp "/app/$OUTPUT_DIR/pi-bun" /app/pi-bun
+
+# Default command: stage the binary into the named volume mounted at /artifacts
+# by the Makefile targets.
+CMD ["sh", "-ec", "cp /app/pi-bun /artifacts/pi-bun && chmod +x /artifacts/pi-bun"]

@@ -235,7 +235,9 @@ export function createReadToolDefinition(
 							let details: ReadToolDetails | undefined;
 							if (mimeType) {
 								// Image attachments are not supported; note the file and omit its contents.
-								content = [{ type: "text", text: `Read image file [${mimeType}]\n${IMAGE_ATTACHMENT_REFUSED_MESSAGE}` }];
+								content = [
+									{ type: "text", text: `Read image file [${mimeType}]\n${IMAGE_ATTACHMENT_REFUSED_MESSAGE}` },
+								];
 							} else {
 								// Read text content.
 								const buffer = await ops.readFile(absolutePath);
