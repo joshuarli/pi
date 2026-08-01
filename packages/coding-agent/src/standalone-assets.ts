@@ -3,7 +3,7 @@
  *
  * Compiled binaries (make bun / make deno) have no files shipped next to the
  * executable. Theme files, HTML export templates, docs, examples, README,
- * CHANGELOG, package.json, and the photon WASM are inlined at build time by
+ * CHANGELOG, and package.json are inlined at build time by
  * scripts/generate-embedded-assets.mjs and extracted here to a cache directory
  * at startup. PI_PACKAGE_DIR is pointed at that directory so every package
  * asset getter in config.ts resolves to the extracted files.

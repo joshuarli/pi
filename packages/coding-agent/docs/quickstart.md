@@ -113,7 +113,7 @@ pi @README.md "Summarize this"
 pi @src/app.ts @src/app.test.ts "Review these together"
 ```
 
-Images or text can be pasted with Ctrl+V (Alt+V on Windows); images can also be dragged into supported terminals.
+Text can be pasted with Ctrl+V (Alt+V on Windows).
 
 ### Run shell commands
 
@@ -149,7 +149,7 @@ For one-shot prompts:
 ```bash
 pi -p "Summarize this codebase"
 cat README.md | pi -p "Summarize this text"
-pi -p @screenshot.png "What's in this image?"
+pi -p @notes.md "Summarize this file"
 ```
 
 Use `--mode json` for JSON event output or `--mode rpc` for process integration.

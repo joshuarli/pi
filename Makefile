@@ -2,7 +2,7 @@
 #
 # `make bun` and `make deno` compile pi into standalone executables (`pi-bun`,
 # `pi-deno`) for the current platform. Themes, HTML export templates, docs,
-# examples, README, CHANGELOG, package.json, and the photon WASM are inlined
+# examples, README, CHANGELOG, and package.json are inlined
 # into the executable by scripts/generate-embedded-assets.mjs and extracted to
 # a cache directory at startup (see packages/coding-agent/src/standalone-assets.ts).
 # The output is a single self-contained executable with no sidecar files.
@@ -34,7 +34,7 @@ DENO_BANNER := 'import { createRequire as __piDenoCreateRequire } from "node:mod
 
 bun: deps build
 	cd packages/coding-agent && $(BUN) build --compile --target=$(BUN_TARGET) \
-		./dist/bun/cli.js ./src/utils/image-resize-worker.ts \
+		./dist/bun/cli.js \
 		--outfile "$(abspath $(BIN_DIR)/pi-bun)"
 	@echo "==> Built $(BIN_DIR)/pi-bun"
 

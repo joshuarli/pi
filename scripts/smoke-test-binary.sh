@@ -60,7 +60,7 @@ CACHE_DIR="${CACHE_DIRS[0]}"
 
 test -f "$CACHE_DIR/.complete" || fail "missing $CACHE_DIR/.complete marker"
 
-for f in package.json README.md CHANGELOG.md photon_rs_bg.wasm; do
+for f in package.json README.md CHANGELOG.md; do
 	test -f "$CACHE_DIR/$f" || fail "missing $CACHE_DIR/$f"
 done
 for d in theme export-html docs examples; do

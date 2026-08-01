@@ -256,7 +256,7 @@ Prefix files with `@` to include them in the message:
 
 ```bash
 pi @prompt.md "Answer this"
-pi -p @screenshot.png "What's in this image?"
+pi -p @notes.md "Summarize this file"
 pi @code.ts @test.ts "Review these files"
 ```
 

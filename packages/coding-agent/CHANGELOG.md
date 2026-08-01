@@ -11,6 +11,10 @@
 - Added page scrolling and marked-message navigation shortcuts to fullscreen mode.
 - Added an optional `scrollbarThumb` theme color for fullscreen scrollbar thumbs, falling back to `selectedBg`.
 
+### Removed
+
+- Removed clipboard image pasting, the Photon WASM image processing dependency, and the `images.autoResize` setting. Inline image attachments are now refused (`read` and `@file` report them as omitted); Ctrl+V pastes plain text.
+
 ### Fixed
 
 - Fixed Kitty image previews in fullscreen mode overlapping the sticky editor and footer dock while scrolling.
