@@ -92,6 +92,8 @@ export interface AuthContext {
 	env(name: string): Promise<string | undefined>;
 	/** Check whether a file exists. Supports a leading `~`. Always false in browsers. */
 	fileExists(path: string): Promise<boolean>;
+	/** Read a text file when the runtime supports it. Undefined in browsers. */
+	readFile?(path: string): Promise<string | undefined>;
 }
 
 /** Result of resolving auth for a model. */

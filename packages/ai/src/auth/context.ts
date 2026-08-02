@@ -2,6 +2,7 @@ import type { AuthContext } from "./types.ts";
 
 interface NodeFsModule {
 	access(path: string): Promise<void>;
+	readFile(path: string, encoding: "utf8"): Promise<string>;
 }
 
 interface NodeOsModule {
@@ -39,6 +40,20 @@ export function defaultProviderAuthContext(): AuthContext {
 				return true;
 			} catch {
 				return false;
+			}
+		},
+
+		async readFile(path: string): Promise<string | undefined> {
+			try {
+				const fs = (await importNodeModule("node:fs/promises")) as NodeFsModule;
+				let resolved = path;
+				if (resolved.startsWith("~")) {
+					const os = (await importNodeModule("node:os")) as NodeOsModule;
+					resolved = os.homedir() + resolved.slice(1);
+				}
+				return await fs.readFile(resolved, "utf8");
+			} catch {
+				return undefined;
 			}
 		},
 	};
