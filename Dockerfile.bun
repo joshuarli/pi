@@ -43,16 +43,25 @@ RUN npm ci --ignore-scripts \
 # run on Alpine. The output binary's linkage follows the Bun flavor (glibc by
 # default, musl when BUN_FLAVOR=musl), so the build verifies it against
 # EXPECTED_LINKAGE after compiling.
-ARG BUN_VERSION=1.3.14
-ARG BUN_FLAVOR=
-RUN flavor_suffix=; \
-    if test -n "$BUN_FLAVOR"; then flavor_suffix="-musl"; fi; \
-    curl -fsSL -o /tmp/bun.zip \
-        "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-aarch64${flavor_suffix}.zip" \
-    && unzip -o /tmp/bun.zip -d /tmp/bun \
-    && mv "/tmp/bun/bun-linux-aarch64${flavor_suffix}/bun" /usr/local/bin/bun \
-    && chmod +x /usr/local/bin/bun \
-    && rm -rf /tmp/bun /tmp/bun.zip
+# TEMPORARY EXPERIMENT: use the locally-provided bun 1.4.0 canary (glibc)
+# linux-aarch64 build instead of the pinned curl download. This is a canary and
+# is glibc-linked, so the musl EXPECTED_LINKAGE build will fail; build with
+# EXPECTED_LINKAGE=glibc. Revert to the curl download below once the experiment
+# is done.
+COPY scripts/bun-canary-test/bun /usr/local/bin/bun
+RUN chmod +x /usr/local/bin/bun
+#
+# ORIGINAL: pinned bun download.
+# ARG BUN_VERSION=1.3.14
+# ARG BUN_FLAVOR=
+# RUN flavor_suffix=; \
+#     if test -n "$BUN_FLAVOR"; then flavor_suffix="-musl"; fi; \
+#     curl -fsSL -o /tmp/bun.zip \
+#         "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-aarch64${flavor_suffix}.zip" \
+#     && unzip -o /tmp/bun.zip -d /tmp/bun \
+#     && mv "/tmp/bun/bun-linux-aarch64${flavor_suffix}/bun" /usr/local/bin/bun \
+#     && chmod +x /usr/local/bin/bun \
+#     && rm -rf /tmp/bun /tmp/bun.zip
 
 # Build the standalone binaries natively (no --target: the container platform is
 # the target platform). Both the full TUI binary (`pi-bun`) and the headless
