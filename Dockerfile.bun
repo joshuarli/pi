@@ -54,15 +54,20 @@ RUN flavor_suffix=; \
     && chmod +x /usr/local/bin/bun \
     && rm -rf /tmp/bun /tmp/bun.zip
 
-# Build the standalone binary natively (no --target: the container platform is
-# the target platform). The elfutils linkage check fails the build when the
-# output does not match EXPECTED_LINKAGE.
+# Build the standalone binaries natively (no --target: the container platform is
+# the target platform). Both the full TUI binary (`pi-bun`) and the headless
+# binary (`pi-headless`, TUI stubbed out via headless/build-headless.mts) are
+# produced. The elfutils linkage check fails the build when the output does not
+# match EXPECTED_LINKAGE.
 ARG EXPECTED_LINKAGE=glibc
 RUN cd packages/coding-agent \
     && bun build --compile ./dist/bun/cli.js \
         --outfile /app/pi-bun \
-    && /app/scripts/verify-binary.sh /app/pi-bun "$EXPECTED_LINKAGE"
+    && /app/scripts/verify-binary.sh /app/pi-bun "$EXPECTED_LINKAGE" \
+    && bun scripts/build-headless.mts /app/pi-headless \
+    && /app/scripts/verify-binary.sh /app/pi-headless "$EXPECTED_LINKAGE"
 
-# Default command: stage the binary into the named volume mounted at /artifacts
-# by the Makefile targets.
-CMD ["sh", "-ec", "cp /app/pi-bun /artifacts/pi-bun && chmod +x /artifacts/pi-bun"]
+# Default command: stage both binaries into the named volume mounted at
+# /artifacts by the Makefile targets.
+CMD ["sh", "-ec", \
+  "cp /app/pi-bun /artifacts/pi-bun && chmod +x /artifacts/pi-bun && cp /app/pi-headless /artifacts/pi-headless && chmod +x /artifacts/pi-headless"]
