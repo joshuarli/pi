@@ -106,6 +106,10 @@
 - Restored GitHub Copilot models returned through account-specific policy responses ([#7672](https://github.com/earendil-works/pi/pull/7672) by [@muyiyr](https://github.com/muyiyr)).
 - Replaced the retired Qwen Token Plan `qwen3.8-max-preview` model with `qwen3.8-max` ([#7670](https://github.com/earendil-works/pi/pull/7670) by [@QuintinShaw](https://github.com/QuintinShaw)).
 
+### Added
+
+- Added a Command Code provider that reuses the CLI's local credential and streams its gateway protocol as a native Pi provider.
+
 ## [0.83.0] - 2026-07-29
 
 ### Breaking Changes
