@@ -4,8 +4,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"clean": "shx rm -rf .eval",
-		"eval": "node scripts/run-evals.mjs",
+		"clean": "rm -rf .eval",
+		"eval": "bun scripts/run-evals.mjs",
 		"test": "vitest run --config vitest.test.config.ts"
 	},
 	"devDependencies": {

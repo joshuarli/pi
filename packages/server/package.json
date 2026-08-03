@@ -32,12 +32,12 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"clean": "shx rm -rf dist",
+		"clean": "rm -rf dist",
 		"dev": "tsgo -p tsconfig.build.json --watch --preserveWatchOutput",
-		"build": "tsgo -p tsconfig.build.json && shx chmod +x dist/legacy/cli.js",
+		"build": "tsgo -p tsconfig.build.json && chmod +x dist/legacy/cli.js",
 		"test": "vitest --run",
 		"typecheck": "tsgo -p tsconfig.test.json",
-		"prepublishOnly": "npm run clean && npm run build"
+		"prepublishOnly": "bun run clean && bun run build"
 	},
 	"keywords": [
 		"pi",
