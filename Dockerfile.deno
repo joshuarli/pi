@@ -29,9 +29,14 @@ ENV PI_SOURCE_SHA=${PI_SOURCE_SHA}
 ARG PI_RUNTIME_SHA=unknown
 ENV PI_RUNTIME_SHA=${PI_RUNTIME_SHA}
 
+# Provider model data is intentionally ignored by git, so hydrate it inside
+# the image before the remaining workspace build runs offline.
 RUN --mount=type=cache,id=pi-deno-bun-install,target=/root/.bun/install/cache \
     export PI_RUNTIME_VERSION="$(deno --version | sed -n '1p')" \
   && bun install --ignore-scripts \
+  && cd packages/ai \
+  && bun run hydrate-model-data \
+  && cd ../.. \
   && bun run build:offline
 
 # Bundle from the Deno-specific entrypoint outside the package ancestry so the

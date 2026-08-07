@@ -9,9 +9,10 @@
 # Vanilla Alpine Linux (latest stable) with the static ARM64 Bun downloaded
 # directly from the BUN_MUSL_URL build argument (a GitHub release asset, see
 # the Makefile). The same Bun builds the workspace from scratch (`bun install`
-# + `bun run build:offline`): no Node runtime and no npm. The workspace is
-# built offline (checked-in model data), and the standalone binary is produced
-# natively. The Makefile target uses a named volume only for artifact staging;
+# + `bun run build:offline`): no Node runtime and no npm. The image hydrates
+# the ignored provider model-data snapshot before the offline workspace build,
+# and the standalone binary is produced natively. The Makefile target uses a
+# named volume only for artifact staging;
 # BuildKit cache mounts persist Bun's install cache between image builds.
 FROM alpine:3.24
 
@@ -49,7 +50,10 @@ RUN echo "${BUN_MUSL_SHA256}  /usr/local/bin/bun" | sha256sum -c - \
 RUN --mount=type=cache,id=pi-bun-install,target=/root/.bun/install/cache \
     export PI_RUNTIME_VERSION="bun $(bun --version)" \
   && bun install --ignore-scripts \
-    && bun run build:offline
+  && cd packages/ai \
+  && bun run hydrate-model-data \
+  && cd ../.. \
+  && bun run build:offline
 
 # Build the standalone binary natively (no --target: the container platform is
 # the target platform). The elfutils linkage check fails the build when the
