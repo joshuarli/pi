@@ -25,6 +25,15 @@ jobs:
       DENO_RUNTIME_SHA256: 0d60fc9495a8b7c25a5eb483cc7052486aaa77a2dd12612488ad8dc489847f2a
 
     steps:
+      - name: Check out the workflow commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C "$GITHUB_WORKSPACE" fetch --depth 1 origin "$GITHUB_SHA"
+          git -C "$GITHUB_WORKSPACE" checkout --detach FETCH_HEAD
+
       - name: Build, smoke-test, and publish the compressed release binary
         shell: bash
         env:
