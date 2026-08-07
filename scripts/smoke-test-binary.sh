@@ -68,7 +68,8 @@ for d in theme export-html docs examples; do
 	test -d "$CACHE_DIR/$d" || fail "missing $CACHE_DIR/$d/"
 done
 
-PKG_VERSION="$(node -e 'const p = require(process.argv[1]); process.stdout.write(p.version)' "$CACHE_DIR/package.json")"
+PKG_VERSION="$(PI_SMOKE_PACKAGE_JSON="$CACHE_DIR/package.json" \
+	node -e 'const p = require(process.env.PI_SMOKE_PACKAGE_JSON); process.stdout.write(p.version)')"
 [ "$PKG_VERSION" = "$VERSION" ] || fail "binary version '$VERSION' != extracted package.json version '$PKG_VERSION'"
 
 # Isolation: extraction must not leak into the working directory.

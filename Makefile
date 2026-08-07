@@ -12,12 +12,15 @@
 #   make bun-test                    # smoke-test the pi-bun binary (run 'make bun' first)
 #   make bun-real-test               # real OpenRouter test (requires OPENROUTER_API_KEY)
 #   make bun-linux-arm64-musl        # build pi-bun (full) for linux-arm64 musl natively in a container
+#   make deno-linux-arm64-musl       # build pi-deno with supplied static Deno/denort
+#   make deno-test                   # smoke-test the staged pi-deno artifact
+#   make clean                       # clean workspace dist trees and staged binaries
 #   make bun SKIP_INSTALL=1          # reuse an existing node_modules
 #   make bun OFFLINE_MODEL_DATA=1    # bundle checked-in model data instead of refreshing it
 
 BUN ?= $(shell if command -v bun >/dev/null 2>&1; then command -v bun; elif test -x "$$HOME/.local/bin/bun"; then printf '%s' "$$HOME/.local/bin/bun"; fi)
 NPM ?= $(shell command -v npm 2>/dev/null || true)
-PACKAGE_MANAGER_GOALS := $(filter bun bun-test bun-real-test fake-provider-test deps build,$(MAKECMDGOALS))
+PACKAGE_MANAGER_GOALS := $(filter bun bun-test bun-real-test deno deno-linux-arm64-musl deno-test fake-provider-test deps build workspace-build workspace-clean clean,$(MAKECMDGOALS))
 ifeq ($(strip $(MAKECMDGOALS)),)
 PACKAGE_MANAGER_GOALS := default
 endif
@@ -35,15 +38,23 @@ else
 PACKAGE_MANAGER := $(BUN)
 endif
 
-# DENO is out of scope (see "deno" target below).
-# DENO ?= deno
+DENO ?= deno
+DOCKER_BUILD ?= docker buildx build
+DOCKER_BUILD_CACHE_ARGS ?=
 ESBUILD := node_modules/.bin/esbuild
 BUN_VERSION ?= 1.4.0
+BUN_RUNTIME_SHA ?= unknown
 PI_SHA ?= $(shell git rev-parse --short HEAD)
 BUN_MUSL_ARTIFACT := pi-$(PI_SHA)-bun-$(BUN_VERSION)-linux-arm64-musl
+DENO_VERSION ?= $(shell if test -n "$(DENO_BIN)" && test -x "$(DENO_BIN)"; then "$(DENO_BIN)" --version | awk 'NR == 1 { print $$2 }'; else echo unknown; fi)
+DENO_RUNTIME_SHA ?= unknown
+DENO_MUSL_ARTIFACT := pi-$(PI_SHA)-deno-$(DENO_VERSION)-linux-arm64-musl-static
 BUN_LINUX_ARM64_MUSL_IMAGE := pi-bun-linux-arm64-musl
 BUN_LINUX_ARM64_MUSL_VOLUME := pi-bun-linux-arm64-musl
 BUN_MUSL_URL ?= https://github.com/joshuarli/bun-musl-static/releases/download/bun-5bf1172b-arm64-static-musl-llvm22/bun
+BUN_MUSL_SHA256 ?= fe6051fae1ba872d042f84d958c3b8df48346361797b6c5fa1cf18013d1eaf7e
+DENO_LINUX_ARM64_MUSL_IMAGE := pi-deno-linux-arm64-musl
+DENO_LINUX_ARM64_MUSL_VOLUME := pi-deno-linux-arm64-musl
 
 OS_NAME := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 OS_ARCH := $(shell uname -m)
@@ -53,13 +64,9 @@ BUN_TARGET := bun-$(PLATFORM)
 OUT_DIR ?= packages/coding-agent/binaries
 BIN_DIR := $(OUT_DIR)/$(PLATFORM)
 
-# Deno is out of scope for this fork; the target is disabled.
-# DENO_BUNDLE := $(BIN_DIR)/.pi-deno-bundle.js
-# DENO_BANNER := 'import { createRequire as __piDenoCreateRequire } from "node:module"; const require = __piDenoCreateRequire(import.meta.url);'
+.PHONY: bun bun-linux-arm64-musl bun-test bun-real-test deno deno-linux-arm64-musl deno-test fake-provider-test clean deps build workspace-build workspace-clean
 
-.PHONY: bun bun-linux-arm64-musl bun-test bun-real-test fake-provider-test clean deps build
-
-bun: deps build
+bun: build
 	@test -n "$(BUN)" || { echo "bun is required for bun build --compile; npm fallback only covers workspace install/build" >&2; exit 1; }
 	cd packages/coding-agent && $(BUN) build --compile --bytecode --format=esm --minify --target=$(BUN_TARGET) \
 		./dist/bun/cli.js \
@@ -80,11 +87,13 @@ bun: deps build
 # anything other than the fully static output.
 #
 bun-linux-arm64-musl:
-	docker build --platform linux/arm64 \
+	$(DOCKER_BUILD) $(DOCKER_BUILD_CACHE_ARGS) --load --platform linux/arm64 \
 		-t $(BUN_LINUX_ARM64_MUSL_IMAGE) \
 		--build-arg BUN_MUSL_URL=$(BUN_MUSL_URL) \
+		--build-arg BUN_MUSL_SHA256=$(BUN_MUSL_SHA256) \
 		--build-arg EXPECTED_LINKAGE=static \
 		--build-arg PI_SOURCE_SHA=$(PI_SHA) \
+		--build-arg PI_RUNTIME_SHA=$(BUN_RUNTIME_SHA) \
 		-f Dockerfile.bun .
 	@mkdir -p "$(OUT_DIR)"
 	@cid=$$(docker create -v $(BUN_LINUX_ARM64_MUSL_VOLUME):/artifacts $(BUN_LINUX_ARM64_MUSL_IMAGE)); \
@@ -93,19 +102,18 @@ bun-linux-arm64-musl:
 	docker rm $$cid
 	@chmod +x "$(OUT_DIR)/$(BUN_MUSL_ARTIFACT)"
 	@echo "==> Built $(OUT_DIR)/$(BUN_MUSL_ARTIFACT)"
-	# The ARM64 binary runs inside the built ARM64 image under QEMU.
-	@test -n "$${OPENROUTER_API_KEY:-}" || { echo "OPENROUTER_API_KEY must be set" >&2; exit 1; }
-	docker run --rm --platform linux/arm64 -e OPENROUTER_API_KEY \
+	# The ARM64 binary runs inside the built ARM64 image under QEMU. Keep build
+	# validation local and deterministic; real-provider testing is opt-in via
+	# bun-real-test.
+	docker run --rm --platform linux/arm64 \
 		$(BUN_LINUX_ARM64_MUSL_IMAGE) \
-		sh -ec 'apk add --no-cache bash >/dev/null && \
+		sh -ec 'apk add --no-cache bash curl >/dev/null && \
 			/app/scripts/smoke-test-binary.sh /app/pi-bun bun && \
-			/app/scripts/smoke-test-fake-provider.sh /app/pi-bun && \
-			/app/scripts/smoke-test-real-provider.sh /app/pi-bun'
+			/app/scripts/smoke-test-fake-provider.sh /app/pi-bun'
 
-# Run the full binary's local and real-provider smoke tests.
+# Run the full binary's local smoke tests.
 bun-test: fake-provider-test
 	@./scripts/smoke-test-binary.sh "$(abspath $(BIN_DIR)/pi-bun)" bun
-	@$(MAKE) bun-real-test
 
 # Run the fake-provider round-trip against the full `pi-bun` binary.
 fake-provider-test:
@@ -116,48 +124,51 @@ fake-provider-test:
 bun-real-test:
 	@./scripts/smoke-test-real-provider.sh "$(abspath $(BIN_DIR)/pi-bun)"
 
-# Deno is out of scope for this fork; the target is disabled.
-# deno-test:
-# 	@./scripts/smoke-test-binary.sh "$(abspath $(BIN_DIR)/pi-deno)" deno
-#
-# deno: deps build
-# 	$(ESBUILD) packages/coding-agent/dist/deno/cli.js --bundle --platform=node \
-# 		--format=esm --main-fields=module,main \
-# 		--banner:js=$(DENO_BANNER) \
-# 		--outfile="$(abspath $(DENO_BUNDLE))"
-# 	@# Compile outside the repo: a package.json in the bundle's ancestry makes
-# 	@# Deno embed the whole node_modules tree. Use a temp dir with no package.json.
-# 	@tmp=$$(mktemp -d); \
-# 	cp "$(abspath $(DENO_BUNDLE))" "$$tmp/pi-deno-bundle.js"; \
-# 	cd "$$tmp" && $(DENO) compile --no-check --allow-all \
-# 		--output "$(abspath $(BIN_DIR)/pi-deno)" "$$tmp/pi-deno-bundle.js"; \
-# 	status=$$?; rm -rf "$$tmp"; exit $$status
-# 	rm -f "$(DENO_BUNDLE)"
-# 	@echo "==> Built $(BIN_DIR)/pi-deno"
+# Build pi-deno using a supplied native static Deno compiler. The compiler is
+# passed as a named BuildKit context so it never enters the source tree or the
+# image as an unverified host bind mount.
+deno: deno-linux-arm64-musl
+
+deno-linux-arm64-musl:
+	@test -x "$(DENO_BIN)" || { echo "DENO_BIN must point to the release deno executable" >&2; exit 1; }
+	@test -x "$(DENO_RT_BIN)" || { echo "DENO_RT_BIN must point to the matching release denort executable" >&2; exit 1; }
+	@tmp=$$(mktemp -d); \
+	trap 'find "$$tmp" -type f -delete; find "$$tmp" -depth -type d -empty -delete' EXIT; \
+	cp "$(DENO_BIN)" "$$tmp/deno"; \
+	cp "$(DENO_RT_BIN)" "$$tmp/denort"; \
+	$(DOCKER_BUILD) $(DOCKER_BUILD_CACHE_ARGS) --load --platform linux/arm64 \
+		--build-context deno-bin="$$tmp" \
+		--build-arg BUN_MUSL_URL=$(BUN_MUSL_URL) \
+		--build-arg BUN_MUSL_SHA256=$(BUN_MUSL_SHA256) \
+		--build-arg PI_RUNTIME_SHA=$(DENO_RUNTIME_SHA) \
+		-t $(DENO_LINUX_ARM64_MUSL_IMAGE) \
+		-f Dockerfile.deno .
+	@mkdir -p "$(OUT_DIR)"
+	@cid=$$(docker create -v $(DENO_LINUX_ARM64_MUSL_VOLUME):/artifacts $(DENO_LINUX_ARM64_MUSL_IMAGE)); \
+	docker start -a $$cid; \
+	docker cp $$cid:/artifacts/pi-deno "$(OUT_DIR)/$(DENO_MUSL_ARTIFACT)"; \
+	docker rm $$cid
+	@chmod +x "$(OUT_DIR)/$(DENO_MUSL_ARTIFACT)"
+	@echo "==> Built $(OUT_DIR)/$(DENO_MUSL_ARTIFACT)"
+	# The ARM64 binary runs inside the built ARM64 image under QEMU.
+	docker run --rm --platform linux/arm64 \
+		$(DENO_LINUX_ARM64_MUSL_IMAGE) \
+		sh -ec 'apk add --no-cache bash curl >/dev/null && \
+			/app/scripts/smoke-test-binary.sh /app/pi-deno deno && \
+			/app/scripts/smoke-test-fake-provider.sh /app/pi-deno'
+
+deno-test:
+	@./scripts/smoke-test-binary.sh "$(abspath $(OUT_DIR)/$(DENO_MUSL_ARTIFACT))" deno
 
 deps:
 	@if [ "$(SKIP_INSTALL)" != "1" ]; then \
-		if [ ! -d node_modules ] || ! node_modules/.bin/tsgo --version >/dev/null 2>&1; then \
 			echo "==> Installing dependencies..."; \
-			if test -n "$(BUN)"; then \
-				if ! "$(BUN)" install --no-save --ignore-scripts; then \
-					if test -n "$(NPM)"; then \
-						echo "==> Bun install failed; falling back to npm ci" >&2; \
-						"$(NPM)" ci --ignore-scripts; \
-					else \
-						echo "Bun install failed and npm is unavailable" >&2; \
-						exit 1; \
-					fi; \
-				fi; \
-			else \
-				"$(NPM)" ci --ignore-scripts; \
-			fi; \
-		fi; \
+		"$(NPM)" install --ignore-scripts; \
 	else \
 		echo "==> Skipping dependency install (SKIP_INSTALL=1)"; \
 	fi
 
-build:
+workspace-build: deps
 	@shim_dir="$$(mktemp -d)"; \
 	trap 'if test -L "$$shim_dir/bun"; then unlink "$$shim_dir/bun"; fi; if test -L "$$shim_dir/npm"; then unlink "$$shim_dir/npm"; fi; rmdir "$$shim_dir"' EXIT; \
 	if test -n "$(BUN)"; then ln -s "$(BUN)" "$$shim_dir/bun"; ln -s "$(BUN)" "$$shim_dir/npm"; fi; \
@@ -168,5 +179,14 @@ build:
 		"$(PACKAGE_MANAGER)" run build; \
 	fi
 
-clean:
-	rm -rf $(OUT_DIR)
+build: workspace-build
+
+workspace-clean:
+	@if test -n "$(NPM)"; then \
+		"$(NPM)" run clean --workspaces --if-present; \
+	else \
+		echo "npm is required for workspace-clean" >&2; exit 1; \
+	fi
+
+clean: workspace-clean
+	@rm -rf "$(OUT_DIR)"
