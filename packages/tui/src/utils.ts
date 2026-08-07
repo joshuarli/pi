@@ -1,8 +1,81 @@
 import { eastAsianWidth } from "get-east-asian-width";
 
-// segmenters (shared instance)
-const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-const wordSegmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+type SegmenterGranularity = "grapheme" | "word";
+
+/**
+ * Normalize the `Intl.Segmenter` result shape across the supported runtimes.
+ * V8 returns `Intl.SegmentData` objects, while the QuickJS backend returns the
+ * segment strings themselves. The TUI needs indexes and `isWordLike`, so keep
+ * that difference behind the shared segmenter instances.
+ */
+function createCompatibleSegmenter(granularity: SegmenterGranularity): Intl.Segmenter {
+	const nativeSegmenter = new Intl.Segmenter(undefined, { granularity });
+
+	return {
+		segment(input: string): Intl.Segments {
+			const normalized: Intl.SegmentData[] = [];
+			let pendingWord: { segment: string; index: number; isWordLike: boolean } | undefined;
+			let inputIndex = 0;
+			const flushPendingWord = (): void => {
+				if (!pendingWord) return;
+				normalized.push({ ...pendingWord, input });
+				pendingWord = undefined;
+			};
+
+			for (const raw of nativeSegmenter.segment(input) as unknown as Iterable<unknown>) {
+				if (typeof raw !== "string") {
+					flushPendingWord();
+					const segment = raw as Intl.SegmentData;
+					normalized.push(segment);
+					inputIndex = segment.index + segment.segment.length;
+					continue;
+				}
+
+				if (granularity === "grapheme") {
+					normalized.push({ segment: raw, index: inputIndex, input });
+					inputIndex += raw.length;
+					continue;
+				}
+
+				const index = inputIndex;
+				inputIndex += raw.length;
+				const isWordLike = /[\p{Letter}\p{Number}]/u.test(raw);
+				const isWhitespace = isWhitespaceChar(raw);
+				const isPunctuation = isPunctuationChar(raw);
+				const canMerge =
+					pendingWord &&
+					pendingWord.isWordLike === isWordLike &&
+					isWhitespaceChar(pendingWord.segment) === isWhitespace &&
+					isPunctuationChar(pendingWord.segment) === isPunctuation &&
+					!cjkBreakRegex.test(raw) &&
+					!cjkBreakRegex.test(pendingWord.segment);
+
+				if (pendingWord && canMerge) {
+					pendingWord.segment += raw;
+				} else {
+					flushPendingWord();
+					pendingWord = { segment: raw, index, isWordLike };
+				}
+			}
+			flushPendingWord();
+
+			return {
+				containing(index: number): Intl.SegmentData | undefined {
+					return normalized.find((segment) => index >= segment.index && index < segment.index + segment.segment.length);
+				},
+				[Symbol.iterator](): Iterator<Intl.SegmentData> {
+					return normalized[Symbol.iterator]();
+				},
+			} as Intl.Segments;
+		},
+		resolvedOptions: () => nativeSegmenter.resolvedOptions(),
+	} as Intl.Segmenter;
+}
+
+// Segmenters (shared instances). QuickJS returns strings from `segment()`;
+// createCompatibleSegmenter adapts those to the V8-compatible result shape.
+const graphemeSegmenter = createCompatibleSegmenter("grapheme");
+const wordSegmenter = createCompatibleSegmenter("word");
 
 /**
  * Get the shared grapheme segmenter instance.

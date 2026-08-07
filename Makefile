@@ -57,6 +57,7 @@ DENO_MUSL_ARTIFACT := pi-$(PI_SHA)-deno-$(DENO_VERSION)-linux-arm64-musl-static
 DENO_MACOS_BIN ?= ../deno-musl-static/target/macos-aarch64-quickjs/aarch64-apple-darwin/release-quickjs/deno
 DENO_MACOS_RT_BIN ?= ../deno-musl-static/target/macos-aarch64-quickjs/aarch64-apple-darwin/release-quickjs/denort
 DENO_MACOS_VERSION ?= $(shell if test -x "$(DENO_MACOS_BIN)"; then "$(DENO_MACOS_BIN)" --version | awk 'NR == 1 { print $$2 }'; else echo unknown; fi)
+DENO_MACOS_RUNTIME_VERSION ?= $(shell if test -x "$(DENO_MACOS_BIN)"; then "$(DENO_MACOS_BIN)" --version | sed -n '1p'; else echo unknown; fi)
 DENO_MACOS_ARTIFACT ?= pi-$(PI_SHA)-deno-$(DENO_MACOS_VERSION)-macos-arm64
 
 BUN_LINUX_ARM64_MUSL_IMAGE := pi-bun-linux-arm64-musl
@@ -171,6 +172,7 @@ deno-test:
 # intentionally uses the normal macOS dynamic system libraries and does not
 # use musl, static-linking checks, or the musl allocator.
 deno-macos-aarch64: export PI_RUNTIME_SHA=$(DENO_RUNTIME_SHA)
+deno-macos-aarch64: export PI_RUNTIME_VERSION=$(DENO_MACOS_RUNTIME_VERSION)
 deno-macos-aarch64: build
 	@test "$(OS_NAME)" = darwin || { echo "macOS targets require macOS 26 or newer" >&2; exit 1; }
 	@test "$(OS_ARCH)" = arm64 || { echo "macOS targets require an arm64 host" >&2; exit 1; }

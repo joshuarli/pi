@@ -12,6 +12,13 @@ type NativeModifiersHelper = {
 
 let nativeModifiersHelper: NativeModifiersHelper | null | undefined;
 
+function supportsNativeNodeAddons(): boolean {
+	// QuickJS Deno does not provide the V8/Node-API host symbols required by
+	// this optional helper. Avoid loading the .node file so its failed symbol
+	// lookups do not become startup or input-time diagnostics.
+	return !(process.versions.deno && process.versions.typescript === "n/a");
+}
+
 function isNativeModifiersHelper(value: unknown): value is NativeModifiersHelper {
 	if (typeof value !== "object" || value === null) return false;
 	const candidate = (value as { isModifierPressed?: unknown }).isModifierPressed;
@@ -21,6 +28,7 @@ function isNativeModifiersHelper(value: unknown): value is NativeModifiersHelper
 function loadNativeModifiersHelper(): NativeModifiersHelper | undefined {
 	if (nativeModifiersHelper !== undefined) return nativeModifiersHelper ?? undefined;
 	nativeModifiersHelper = null;
+	if (!supportsNativeNodeAddons()) return undefined;
 	const arch = process.arch;
 	if (arch !== "x64" && arch !== "arm64") return undefined;
 
