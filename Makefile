@@ -13,6 +13,7 @@
 #   make bun-real-test               # real OpenRouter test (requires OPENROUTER_API_KEY)
 #   make bun-linux-arm64-musl        # build pi-bun (full) for linux-arm64 musl natively in a container
 #   make deno-linux-arm64-musl       # build pi-deno with supplied static Deno/denort
+#   make deno-macos-aarch64          # build pi-deno with native macOS QuickJS Deno/denort
 #   make deno-test                   # smoke-test the staged pi-deno artifact
 #   make clean                       # clean workspace dist trees and staged binaries
 #   make bun SKIP_INSTALL=1          # reuse an existing node_modules
@@ -20,7 +21,7 @@
 
 BUN ?= $(shell if command -v bun >/dev/null 2>&1; then command -v bun; elif test -x "$$HOME/.local/bin/bun"; then printf '%s' "$$HOME/.local/bin/bun"; fi)
 NPM ?= $(shell command -v npm 2>/dev/null || true)
-PACKAGE_MANAGER_GOALS := $(filter bun bun-test bun-real-test deno deno-linux-arm64-musl deno-test fake-provider-test deps build workspace-build workspace-clean clean,$(MAKECMDGOALS))
+PACKAGE_MANAGER_GOALS := $(filter bun bun-test bun-real-test deno deno-linux-arm64-musl deno-macos-aarch64 deno-macos-aarch64-test deno-test fake-provider-test deps build workspace-build workspace-clean clean,$(MAKECMDGOALS))
 ifeq ($(strip $(MAKECMDGOALS)),)
 PACKAGE_MANAGER_GOALS := default
 endif
@@ -49,6 +50,15 @@ BUN_MUSL_ARTIFACT := pi-$(PI_SHA)-bun-$(BUN_VERSION)-linux-arm64-musl
 DENO_VERSION ?= $(shell if test -n "$(DENO_BIN)" && test -x "$(DENO_BIN)"; then "$(DENO_BIN)" --version | awk 'NR == 1 { print $$2 }'; else echo unknown; fi)
 DENO_RUNTIME_SHA ?= unknown
 DENO_MUSL_ARTIFACT := pi-$(PI_SHA)-deno-$(DENO_VERSION)-linux-arm64-musl-static
+
+# The local default points at the sibling Deno checkout's optimized
+# release-quickjs compiler/runtime pair. CI overrides both paths with the
+# matching macOS QuickJS pair downloaded from the selected Deno release.
+DENO_MACOS_BIN ?= ../deno-musl-static/target/macos-aarch64-quickjs/aarch64-apple-darwin/release-quickjs/deno
+DENO_MACOS_RT_BIN ?= ../deno-musl-static/target/macos-aarch64-quickjs/aarch64-apple-darwin/release-quickjs/denort
+DENO_MACOS_VERSION ?= $(shell if test -x "$(DENO_MACOS_BIN)"; then "$(DENO_MACOS_BIN)" --version | awk 'NR == 1 { print $$2 }'; else echo unknown; fi)
+DENO_MACOS_ARTIFACT ?= pi-$(PI_SHA)-deno-$(DENO_MACOS_VERSION)-macos-arm64
+
 BUN_LINUX_ARM64_MUSL_IMAGE := pi-bun-linux-arm64-musl
 BUN_LINUX_ARM64_MUSL_VOLUME := pi-bun-linux-arm64-musl
 BUN_MUSL_URL ?= https://github.com/joshuarli/bun-musl-static/releases/download/bun-5bf1172b-arm64-static-musl-llvm22/bun
@@ -64,9 +74,9 @@ BUN_TARGET := bun-$(PLATFORM)
 OUT_DIR ?= packages/coding-agent/binaries
 BIN_DIR := $(OUT_DIR)/$(PLATFORM)
 
-.PHONY: bun bun-linux-arm64-musl bun-test bun-real-test deno deno-linux-arm64-musl deno-test fake-provider-test clean deps build workspace-build workspace-clean
+.PHONY: bun bun-linux-arm64-musl bun-test bun-real-test deno deno-linux-arm64-musl deno-macos-aarch64 deno-macos-aarch64-test deno-test fake-provider-test clean deps build workspace-build workspace-clean
 
-bun: build
+pi-bun: build
 	@test -n "$(BUN)" || { echo "bun is required for bun build --compile; npm fallback only covers workspace install/build" >&2; exit 1; }
 	cd packages/coding-agent && $(BUN) build --compile --bytecode --format=esm --minify --target=$(BUN_TARGET) \
 		./dist/bun/cli.js \
@@ -124,10 +134,7 @@ fake-provider-test:
 bun-real-test:
 	@./scripts/smoke-test-real-provider.sh "$(abspath $(BIN_DIR)/pi-bun)"
 
-# Build pi-deno using a supplied native static Deno compiler. The compiler is
-# passed as a named BuildKit context so it never enters the source tree or the
-# image as an unverified host bind mount.
-deno: deno-linux-arm64-musl
+pi-deno: deno-macos-aarch64
 
 deno-linux-arm64-musl:
 	@test -x "$(DENO_BIN)" || { echo "DENO_BIN must point to the release deno executable" >&2; exit 1; }
@@ -159,6 +166,42 @@ deno-linux-arm64-musl:
 
 deno-test:
 	@./scripts/smoke-test-binary.sh "$(abspath $(OUT_DIR)/$(DENO_MUSL_ARTIFACT))" deno
+
+# Build pi-deno natively on macOS 26+ arm64. Unlike the Linux target, this
+# intentionally uses the normal macOS dynamic system libraries and does not
+# use musl, static-linking checks, or the musl allocator.
+deno-macos-aarch64: export PI_RUNTIME_SHA=$(DENO_RUNTIME_SHA)
+deno-macos-aarch64: build
+	@test "$(OS_NAME)" = darwin || { echo "macOS targets require macOS 26 or newer" >&2; exit 1; }
+	@test "$(OS_ARCH)" = arm64 || { echo "macOS targets require an arm64 host" >&2; exit 1; }
+	@macos_major=$$(sw_vers -productVersion | cut -d. -f1); \
+	test "$$macos_major" -ge 26 || { echo "macOS targets require macOS 26 or newer" >&2; exit 1; }
+	@test -x "$(DENO_MACOS_BIN)" || { echo "DENO_MACOS_BIN must point to the QuickJS macOS deno executable" >&2; exit 1; }
+	@test -x "$(DENO_MACOS_RT_BIN)" || { echo "DENO_MACOS_RT_BIN must point to the matching QuickJS macOS denort executable" >&2; exit 1; }
+	@tmp=$$(mktemp -d); \
+	trap 'rm -rf "$$tmp"' EXIT; \
+	$(ESBUILD) packages/coding-agent/dist/deno/cli.js \
+		--bundle \
+		--platform=node \
+		--format=esm \
+		--main-fields=module,main \
+		--banner:js='import { createRequire as __piDenoCreateRequire } from "node:module"; const require = __piDenoCreateRequire(import.meta.url);' \
+		--outfile="$$tmp/pi-deno-bundle.js"; \
+	node scripts/prepare-deno-bundle.mjs \
+		"$$tmp/pi-deno-bundle.js" "$$tmp/pi-deno-bundle.cjs"; \
+	DENORT_BIN="$(DENO_MACOS_RT_BIN)" "$(DENO_MACOS_BIN)" compile --no-check --allow-all \
+		--engine quickjs --output "$$tmp/pi-deno" "$$tmp/pi-deno-bundle.cjs"; \
+	mkdir -p "$(OUT_DIR)"; \
+	cp "$$tmp/pi-deno" "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
+	chmod +x "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
+	file "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
+	"$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)" --version
+	@$(MAKE) --no-print-directory deno-macos-aarch64-test \
+		DENO_MACOS_ARTIFACT="$(DENO_MACOS_ARTIFACT)" OUT_DIR="$(OUT_DIR)"
+
+deno-macos-aarch64-test:
+	@./scripts/smoke-test-binary.sh "$(abspath $(OUT_DIR)/$(DENO_MACOS_ARTIFACT))" deno-macos-aarch64
+	@./scripts/smoke-test-fake-provider.sh "$(abspath $(OUT_DIR)/$(DENO_MACOS_ARTIFACT))"
 
 deps:
 	@if [ "$(SKIP_INSTALL)" != "1" ]; then \

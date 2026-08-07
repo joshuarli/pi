@@ -1,0 +1,220 @@
+name: Build pi binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      deno_sha:
+        description: Full Deno commit SHA whose prerelease archives should be downloaded
+        required: true
+        default: ae3a64b9ad9e4a9f6341edf537c46245c62b4cfb
+      bun_sha:
+        description: Full Bun commit SHA whose prerelease asset should be downloaded when Bun builds are re-enabled
+        required: false
+        default: a9644683f1243a7c22969056be38b616218956e3
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-arm64-musl-deno
+            runner: ubuntu-24.04-arm
+            kind: deno
+            deno_release_suffix: linux-musl-static
+            compiler_asset: deno-quickjs-aarch64-unknown-linux-musl
+            runtime_asset: denort-quickjs-aarch64-unknown-linux-musl
+            make_target: deno-linux-arm64-musl
+            artifact_suffix: linux-arm64-musl-static
+            upload_name: pi-deno-linux-arm64-musl
+          - name: macos-arm64-deno
+            runner: macos-26
+            kind: deno
+            deno_release_suffix: linux-musl-static
+            compiler_asset: deno-quickjs-aarch64-apple-darwin
+            runtime_asset: denort-quickjs-aarch64-apple-darwin
+            make_target: deno-macos-aarch64
+            artifact_suffix: macos-arm64
+            upload_name: pi-deno-macos-arm64
+
+          # Bun builds are intentionally disabled while the Bun-specific LLVM
+          # issue is being fixed. Keep these entries ready to re-enable without
+          # changing the single-release publishing path below.
+          # - name: linux-arm64-musl-bun
+          #   runner: ubuntu-24.04-arm
+          #   kind: bun
+          #   artifact_suffix: linux-arm64-musl-static
+          #   upload_name: pi-bun-linux-arm64-musl
+          # - name: linux-arm64-musl-bun-llvm22
+          #   runner: ubuntu-24.04-arm
+          #   kind: bun
+          #   artifact_suffix: linux-arm64-musl-static-llvm22
+          #   upload_name: pi-bun-linux-arm64-musl-llvm22
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+
+    env:
+      DENO_RELEASE_REPOSITORY: joshuarli/deno-musl-static
+      DENO_SHA: ${{ inputs.deno_sha }}
+      BUN_RELEASE_REPOSITORY: joshuarli/bun-musl-static
+      BUN_SHA: ${{ inputs.bun_sha }}
+      # These checksums are for the pinned Deno release above. Update them
+      # together with the workflow input default when moving to another release.
+      DENO_COMPILER_SHA256: 5258fae19edc0570506e6cbfa9c0c26a510cd687795ba54129da554607dd9349
+      DENO_RUNTIME_SHA256: 0d60fc9495a8b7c25a5eb483cc7052486aaa77a2dd12612488ad8dc489847f2a
+
+    steps:
+      - name: Check out the workflow commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C "$GITHUB_WORKSPACE" fetch --depth 1 origin "$GITHUB_SHA"
+          git -C "$GITHUB_WORKSPACE" checkout --detach FETCH_HEAD
+
+      - name: Build and smoke-test ${{ matrix.name }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          work_dir="$RUNNER_TEMP/pi-build"
+          compiler_dir="$work_dir/compiler"
+          artifact_dir="$work_dir/artifact"
+          mkdir -p "$compiler_dir" "$artifact_dir"
+
+          if [ "${{ matrix.kind }}" = deno ]; then
+            [[ "$DENO_SHA" =~ ^[0-9a-f]{40}$ ]]
+            artifact_name="pi-${GITHUB_SHA}-deno-${DENO_SHA}-${{ matrix.artifact_suffix }}"
+            deno_release="deno-${DENO_SHA}-${{ matrix.deno_release_suffix }}"
+            release_url="https://github.com/${DENO_RELEASE_REPOSITORY}/releases/download/${deno_release}"
+            compiler_archive="$work_dir/${{ matrix.compiler_asset }}.zip"
+            runtime_archive="$work_dir/${{ matrix.runtime_asset }}.zip"
+
+            curl --fail --location --retry 3 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -o "$compiler_archive" \
+              "$release_url/${{ matrix.compiler_asset }}.zip"
+            curl --fail --location --retry 3 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -o "$runtime_archive" \
+              "$release_url/${{ matrix.runtime_asset }}.zip"
+            if [ "${{ matrix.runner }}" = ubuntu-24.04-arm ]; then
+              echo "$DENO_COMPILER_SHA256  $compiler_archive" | sha256sum --check --status -
+              echo "$DENO_RUNTIME_SHA256  $runtime_archive" | sha256sum --check --status -
+            fi
+            unzip -p "$compiler_archive" "${{ matrix.compiler_asset }}" > "$compiler_dir/deno"
+            unzip -p "$runtime_archive" "${{ matrix.runtime_asset }}" > "$compiler_dir/denort"
+            chmod 0755 "$compiler_dir/deno" "$compiler_dir/denort"
+
+            cd "$GITHUB_WORKSPACE"
+            if [ "${{ matrix.runner }}" = macos-26 ]; then
+              make "${{ matrix.make_target }}" \
+                DENO_MACOS_BIN="$compiler_dir/deno" \
+                DENO_MACOS_RT_BIN="$compiler_dir/denort" \
+                DENO_MACOS_ARTIFACT="$artifact_name" \
+                DENO_RUNTIME_SHA="$DENO_SHA" \
+                OUT_DIR="$artifact_dir"
+            else
+              make "${{ matrix.make_target }}" \
+                DENO_BIN="$compiler_dir/deno" \
+                DENO_RT_BIN="$compiler_dir/denort" \
+                DENO_RUNTIME_SHA="$DENO_SHA" \
+                DENO_MUSL_ARTIFACT="$artifact_name" \
+                OUT_DIR="$artifact_dir"
+            fi
+          else
+            [[ "$BUN_SHA" =~ ^[0-9a-f]{40}$ ]]
+            bun_release="bun-${BUN_SHA}-linux-aarch64-musl-static"
+            bun_url="https://github.com/${BUN_RELEASE_REPOSITORY}/releases/download/${bun_release}/bun"
+            curl --fail --location --retry 3 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -o "$compiler_dir/bun" \
+              "$bun_url"
+            chmod 0755 "$compiler_dir/bun"
+            bun_sha256="$(sha256sum "$compiler_dir/bun" | awk '{print $1}')"
+
+            cd "$GITHUB_WORKSPACE"
+            make bun-linux-arm64-musl \
+              BUN_MUSL_URL="$bun_url" \
+              BUN_MUSL_SHA256="$bun_sha256" \
+              BUN_RUNTIME_SHA="$BUN_SHA" \
+              DOCKER_BUILD_CACHE_ARGS='--cache-from type=gha,scope=pi-bun --cache-to type=gha,mode=max,scope=pi-bun' \
+              OUT_DIR="$artifact_dir"
+            built_artifact="$(find "$artifact_dir" -maxdepth 1 -type f -name 'pi-*-bun-*-linux-arm64-musl' -print -quit)"
+            test -n "$built_artifact"
+            artifact_name="pi-${GITHUB_SHA}-bun-${BUN_SHA}-${{ matrix.artifact_suffix }}"
+            cp "$built_artifact" "$artifact_dir/$artifact_name"
+          fi
+
+          artifact="$artifact_dir/$artifact_name"
+          test -x "$artifact"
+          file "$artifact"
+          if [ "${{ matrix.kind }}" = deno ] && [ "${{ matrix.runner }}" = ubuntu-24.04-arm ]; then
+            test -z "$(readelf -lW "$artifact" | awk '/INTERP/{print}')"
+            test -z "$(readelf -dW "$artifact" | awk '/NEEDED/{print}')"
+          fi
+          artifact_archive="$artifact_dir/$artifact_name.zip"
+          (
+            cd "$artifact_dir"
+            zip -9 -X -q "$(basename "$artifact_archive")" "$artifact_name"
+          )
+          unzip -tq "$artifact_archive"
+
+      - name: Upload ${{ matrix.name }} archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.upload_name }}
+          path: ${{ runner.temp }}/pi-build/artifact/*.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish pi prerelease
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      DENO_SHA: ${{ inputs.deno_sha }}
+    steps:
+      - name: Download build archives
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish one prerelease with all pi binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          expected_deno_assets=(
+            "pi-${GITHUB_SHA}-deno-${DENO_SHA}-linux-arm64-musl-static.zip"
+            "pi-${GITHUB_SHA}-deno-${DENO_SHA}-macos-arm64.zip"
+          )
+          for expected_asset in "${expected_deno_assets[@]}"; do
+            test -n "$(find artifacts -type f -name "$expected_asset" -print -quit)"
+          done
+
+          release_files=()
+          while IFS= read -r -d '' release_file; do
+            release_files+=("$release_file")
+            unzip -tq "$release_file"
+          done < <(find artifacts -type f -name '*.zip' -print0 | sort -z)
+          test "${#release_files[@]}" -ge 2
+
+          release_name="pi-${GITHUB_SHA}"
+          gh release create "$release_name" \
+            "${release_files[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$release_name" \
+            --notes "Deno pi binaries built with Deno ${DENO_SHA}. Bun matrix entries remain disabled while its LLVM issue is investigated." \
+            --prerelease

@@ -51,13 +51,13 @@ VERSION="$(printf '%s' "$VERSION_OUT" | sed -E 's/^pi ([0-9]+\.[0-9]+\.[0-9]+).*
 # Second run exercises the cache-reuse path (same TMPDIR).
 ( cd "$WORK" && "$BIN" --help >/dev/null 2>&1 ) || fail "--help exited non-zero"
 
-mapfile -t CACHE_DIRS < <(find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' | sort)
-if [ "${#CACHE_DIRS[@]}" -ne 1 ]; then
+cache_count="$(find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' | wc -l | tr -d ' ')"
+if [ "$cache_count" -ne 1 ]; then
 	echo "FAIL: expected exactly one extracted cache dir under TMPDIR; found:" >&2
-	printf '  %s\n' "${CACHE_DIRS[@]}" >&2
+	find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' -print | sort | sed 's/^/  /' >&2
 	exit 1
 fi
-CACHE_DIR="${CACHE_DIRS[0]}"
+CACHE_DIR="$(find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' -print -quit)"
 
 test -f "$CACHE_DIR/.complete" || fail "missing $CACHE_DIR/.complete marker"
 
