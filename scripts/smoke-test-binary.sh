@@ -43,10 +43,10 @@ fail() {
 
 echo "==> smoke-test: $NAME ($(basename "$BIN"))"
 
-VERSION_OUT="$(cd "$WORK" && "$BIN" --version)" || fail "--version exited non-zero"
-# --version reports "pi <semver> (<source sha>) <runtime>"; extract the semver.
+VERSION_OUT="$(cd "$WORK" && "$BIN" -v)" || fail "-v exited non-zero"
+# -v reports "pi <semver> (<source sha>) <runtime>"; extract the semver.
 VERSION="$(printf '%s' "$VERSION_OUT" | sed -E 's/^pi ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "--version output '$VERSION_OUT' is not a semver"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "-v output '$VERSION_OUT' is not a semver"
 
 # Second run exercises the cache-reuse path (same TMPDIR).
 ( cd "$WORK" && "$BIN" --help >/dev/null 2>&1 ) || fail "--help exited non-zero"

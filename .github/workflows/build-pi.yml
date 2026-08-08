@@ -6,7 +6,7 @@ on:
       deno_sha:
         description: Full Deno commit SHA whose prerelease archives should be downloaded
         required: true
-        default: 671a92517269d0191d031c5476bdb03ae53d5c78
+        default: 5ea581da3280cd5321c4a2ee6c761466a37d3bc6
       bun_sha:
         description: Full Bun commit SHA whose prerelease asset should be downloaded when Bun builds are re-enabled
         required: false
@@ -25,11 +25,10 @@ jobs:
           - name: linux-arm64-musl-deno
             runner: ubuntu-24.04-arm
             kind: deno
-            deno_release_suffix: linux-musl-static
             compiler_asset: deno-quickjs-aarch64-unknown-linux-musl
             runtime_asset: denort-quickjs-aarch64-unknown-linux-musl
-            compiler_sha256: 3c9a27c192dcf6a015a9ea68153583e13fd97db6c54df854641909444464298c
-            runtime_sha256: a93e2e5c4af455db03c78513a5ec83b210d772398cb468f922b00382362a67ba
+            compiler_sha256: 1423dc8af205e8ea4cb2f5509c6a6dbeece2dd9644929592ef816abbf788134b
+            runtime_sha256: 44673d6a2bdf1d61eac134cb4a609c38ed6766fc9369de50d36512e5bce9070d
             make_target: deno-linux-arm64-musl
             docker_platform: linux/arm64
             artifact_suffix: linux-arm64-musl-static
@@ -37,11 +36,10 @@ jobs:
           - name: linux-amd64-musl-deno
             runner: ubuntu-24.04-arm
             kind: deno
-            deno_release_suffix: linux-musl-static
             compiler_asset: deno-quickjs-x86_64-unknown-linux-musl
             runtime_asset: denort-quickjs-x86_64-unknown-linux-musl
-            compiler_sha256: 9436c1d3f92ac97d600cb1c8eb1d20c2611a0896a75fdefc8f0f6e6a1556152d
-            runtime_sha256: 80c20f06bdf4120ff2763d69f6e86a43a9424fec1d773a7800aea649e812d9ea
+            compiler_sha256: 4f13b13fa38e6631ed19649b504f49c83c3493c1915fd5398ae89db73153e062
+            runtime_sha256: 401e29b25c395140fbb97bc01667cac74ffb1187702a591f0e18acef2f5b4411
             make_target: deno-linux-x86_64-musl
             docker_platform: linux/amd64
             artifact_suffix: linux-amd64-musl-static
@@ -49,11 +47,10 @@ jobs:
           - name: macos-arm64-deno
             runner: macos-26
             kind: deno
-            deno_release_suffix: linux-musl-static
             compiler_asset: deno-quickjs-aarch64-apple-darwin
             runtime_asset: denort-quickjs-aarch64-apple-darwin
-            compiler_sha256: 228cbbf86d7de0884660eada6b6e269db6656006d2c96e77ef6815b9e3cfc74c
-            runtime_sha256: 81134a1ef922719acf3908bef895202ccac5d39cd2e60a4ae8a427ca315abeb2
+            compiler_sha256: 5ca64f1968687ae112e5f95f9790cf0625f8be529a04c05833947fdbf6b258fa
+            runtime_sha256: 332aa422ed0d3698e22cd40a30e9490a68aec198b066402c4495568d3f98c881
             make_target: deno-macos-aarch64
             artifact_suffix: macos-arm64
             upload_name: pi-deno-macos-arm64
@@ -104,7 +101,7 @@ jobs:
           if [ "${{ matrix.kind }}" = deno ]; then
             [[ "$DENO_SHA" =~ ^[0-9a-f]{40}$ ]]
             artifact_name="pi-${GITHUB_SHA}-deno-${DENO_SHA}-${{ matrix.artifact_suffix }}"
-            deno_release="deno-${DENO_SHA}-${{ matrix.deno_release_suffix }}"
+            deno_release="prerelease-${DENO_SHA}"
             release_url="https://github.com/${DENO_RELEASE_REPOSITORY}/releases/download/${deno_release}"
             compiler_archive="$work_dir/${{ matrix.compiler_asset }}.zip"
             runtime_archive="$work_dir/${{ matrix.runtime_asset }}.zip"

@@ -62,8 +62,9 @@ prerelease containing all active pi archives. Bun inputs and commented matrix
 entries remain documented there for later re-enablement, but Bun builds are
 currently disabled while its LLVM issue is investigated.
 
-The old `.github/workflows/build.yml` is intentionally absent. Deno's own
-workflow publishes these compiler/runtime archives:
+The old `.github/workflows/build.yml` is intentionally absent. The pinned Deno
+prerelease `prerelease-5ea581da3280cd5321c4a2ee6c761466a37d3bc6` publishes these
+compiler/runtime archives:
 
 ```text
 deno-quickjs-aarch64-unknown-linux-musl.zip

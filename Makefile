@@ -50,8 +50,8 @@ BUN_MUSL_ARTIFACT := pi-$(PI_SHA)-bun-$(BUN_VERSION)-linux-arm64-musl
 # All Deno targets use compiler/runtime pairs from one immutable release. The
 # per-platform fetch targets are only used when the corresponding DENO_BIN and
 # DENO_RT_BIN overrides do not already point at executables.
-DENO_RELEASE_SHA ?= 671a92517269d0191d031c5476bdb03ae53d5c78
-DENO_RELEASE_TAG ?= deno-$(DENO_RELEASE_SHA)-linux-musl-static
+DENO_RELEASE_SHA ?= 5ea581da3280cd5321c4a2ee6c761466a37d3bc6
+DENO_RELEASE_TAG ?= prerelease-$(DENO_RELEASE_SHA)
 DENO_RELEASE_BASE_URL ?= https://github.com/joshuarli/deno-musl-static/releases/download/$(DENO_RELEASE_TAG)
 DENO_CACHE_DIR ?= .artifacts/deno/$(DENO_RELEASE_SHA)
 DENO_LINUX_ARM64_BIN ?= $(DENO_CACHE_DIR)/linux-arm64/deno
@@ -79,12 +79,12 @@ DENO_LINUX_IMAGE ?= pi-deno-linux-arm64-musl
 DENO_LINUX_VOLUME ?= pi-deno-linux-arm64-musl
 DENO_LINUX_PLATFORM ?= linux/arm64
 
-DENO_LINUX_ARM64_COMPILER_SHA256 := 3c9a27c192dcf6a015a9ea68153583e13fd97db6c54df854641909444464298c
-DENO_LINUX_ARM64_RUNTIME_SHA256 := a93e2e5c4af455db03c78513a5ec83b210d772398cb468f922b00382362a67ba
-DENO_LINUX_X86_64_COMPILER_SHA256 := 9436c1d3f92ac97d600cb1c8eb1d20c2611a0896a75fdefc8f0f6e6a1556152d
-DENO_LINUX_X86_64_RUNTIME_SHA256 := 80c20f06bdf4120ff2763d69f6e86a43a9424fec1d773a7800aea649e812d9ea
-DENO_MACOS_COMPILER_SHA256 := 228cbbf86d7de0884660eada6b6e269db6656006d2c96e77ef6815b9e3cfc74c
-DENO_MACOS_RUNTIME_SHA256 := 81134a1ef922719acf3908bef895202ccac5d39cd2e60a4ae8a427ca315abeb2
+DENO_LINUX_ARM64_COMPILER_SHA256 := 1423dc8af205e8ea4cb2f5509c6a6dbeece2dd9644929592ef816abbf788134b
+DENO_LINUX_ARM64_RUNTIME_SHA256 := 44673d6a2bdf1d61eac134cb4a609c38ed6766fc9369de50d36512e5bce9070d
+DENO_LINUX_X86_64_COMPILER_SHA256 := 4f13b13fa38e6631ed19649b504f49c83c3493c1915fd5398ae89db73153e062
+DENO_LINUX_X86_64_RUNTIME_SHA256 := 401e29b25c395140fbb97bc01667cac74ffb1187702a591f0e18acef2f5b4411
+DENO_MACOS_COMPILER_SHA256 := 5ca64f1968687ae112e5f95f9790cf0625f8be529a04c05833947fdbf6b258fa
+DENO_MACOS_RUNTIME_SHA256 := 332aa422ed0d3698e22cd40a30e9490a68aec198b066402c4495568d3f98c881
 
 OS_NAME := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 OS_ARCH := $(shell uname -m)
@@ -213,10 +213,10 @@ deno-fetch-linux-arm64:
 	@if ! test -x "$(DENO_BIN)" || ! test -x "$(DENO_RT_BIN)"; then \
 		mkdir -p "$(dir $(DENO_BIN))" "$(dir $(DENO_RT_BIN))"; \
 		curl --fail --location --retry 3 -o "$(DENO_BIN).zip" "$(DENO_RELEASE_BASE_URL)/deno-quickjs-aarch64-unknown-linux-musl.zip"; \
-		echo "$(DENO_LINUX_ARM64_COMPILER_SHA256)  $(DENO_BIN).zip" | sha256sum -c -; \
+		echo "$(DENO_LINUX_ARM64_COMPILER_SHA256)  $(DENO_BIN).zip" | if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi; \
 		unzip -p "$(DENO_BIN).zip" deno-quickjs-aarch64-unknown-linux-musl > "$(DENO_BIN)"; \
 		curl --fail --location --retry 3 -o "$(DENO_RT_BIN).zip" "$(DENO_RELEASE_BASE_URL)/denort-quickjs-aarch64-unknown-linux-musl.zip"; \
-		echo "$(DENO_LINUX_ARM64_RUNTIME_SHA256)  $(DENO_RT_BIN).zip" | sha256sum -c -; \
+		echo "$(DENO_LINUX_ARM64_RUNTIME_SHA256)  $(DENO_RT_BIN).zip" | if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi; \
 		unzip -p "$(DENO_RT_BIN).zip" denort-quickjs-aarch64-unknown-linux-musl > "$(DENO_RT_BIN)"; \
 		chmod 0755 "$(DENO_BIN)" "$(DENO_RT_BIN)"; \
 	fi
@@ -225,17 +225,19 @@ deno-fetch-linux-x86_64:
 	@if ! test -x "$(DENO_BIN)" || ! test -x "$(DENO_RT_BIN)"; then \
 		mkdir -p "$(dir $(DENO_BIN))" "$(dir $(DENO_RT_BIN))"; \
 		curl --fail --location --retry 3 -o "$(DENO_BIN).zip" "$(DENO_RELEASE_BASE_URL)/deno-quickjs-x86_64-unknown-linux-musl.zip"; \
-		echo "$(DENO_LINUX_X86_64_COMPILER_SHA256)  $(DENO_BIN).zip" | sha256sum -c -; \
+		echo "$(DENO_LINUX_X86_64_COMPILER_SHA256)  $(DENO_BIN).zip" | if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi; \
 		unzip -p "$(DENO_BIN).zip" deno-quickjs-x86_64-unknown-linux-musl > "$(DENO_BIN)"; \
 		curl --fail --location --retry 3 -o "$(DENO_RT_BIN).zip" "$(DENO_RELEASE_BASE_URL)/denort-quickjs-x86_64-unknown-linux-musl.zip"; \
-		echo "$(DENO_LINUX_X86_64_RUNTIME_SHA256)  $(DENO_RT_BIN).zip" | sha256sum -c -; \
+		echo "$(DENO_LINUX_X86_64_RUNTIME_SHA256)  $(DENO_RT_BIN).zip" | if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi; \
 		unzip -p "$(DENO_RT_BIN).zip" denort-quickjs-x86_64-unknown-linux-musl > "$(DENO_RT_BIN)"; \
 		chmod 0755 "$(DENO_BIN)" "$(DENO_RT_BIN)"; \
 	fi
 
 # Build pi-deno natively on macOS 26+ arm64. Unlike the Linux target, this
 # intentionally uses the normal macOS dynamic system libraries and does not
-# use musl, static-linking checks, or the musl allocator.
+# use musl, static-linking checks, or the musl allocator. QuickJS Deno reserves
+# --version for the embedded runtime, so the recipe and smoke test use pi's -v
+# handler.
 deno-macos-aarch64: export PI_RUNTIME_SHA=$(DENO_MACOS_RUNTIME_SHA)
 deno-macos-aarch64: export PI_RUNTIME_VERSION=$(DENO_MACOS_RUNTIME_VERSION)
 deno-macos-aarch64: deno-fetch-macos-aarch64 build
@@ -265,7 +267,7 @@ deno-macos-aarch64: deno-fetch-macos-aarch64 build
 	cp "$$tmp/pi-deno" "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
 	chmod +x "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
 	file "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
-	"$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)" --version
+	"$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)" -v
 	@$(MAKE) --no-print-directory deno-macos-aarch64-test \
 		DENO_MACOS_ARTIFACT="$(DENO_MACOS_ARTIFACT)" OUT_DIR="$(OUT_DIR)"
 
