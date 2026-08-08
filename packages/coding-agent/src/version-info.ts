@@ -1,9 +1,8 @@
 import { APP_NAME, VERSION } from "./config.ts";
-import { SOURCE_SHA } from "./version.generated.ts";
+import { RUNTIME_SHA, RUNTIME_VERSION, SOURCE_SHA } from "./version.generated.ts";
 
 function runtimeLabel(): string {
-	if (process.versions.bun) return `bun ${process.versions.bun}`;
-	if (process.versions.deno) return `deno ${process.versions.deno}`;
+	if (process.versions.bun || process.versions.deno) return `${RUNTIME_VERSION} (${RUNTIME_SHA})`;
 	return `node ${process.versions.node ?? "unknown"}`;
 }
 

@@ -9,19 +9,19 @@
 # Vanilla Alpine Linux (latest stable) with the static ARM64 Bun downloaded
 # directly from the BUN_MUSL_URL build argument (a GitHub release asset, see
 # the Makefile). The same Bun builds the workspace from scratch (`bun install`
-# + `bun run build:offline`): no Node runtime and no npm. The workspace is
-# built offline (checked-in model data), and the standalone binary is produced
-# natively. The Makefile target runs this image with a named volume at
-# /artifacts (no bind mounts) and extracts the binary to the host. The output
-# is verified with elfutils before it is staged.
+# + `bun run build:offline`): no Node runtime and no npm. The image hydrates
+# the ignored provider model-data snapshot before the offline workspace build,
+# and the standalone binary is produced natively. The Makefile target uses a
+# named volume only for artifact staging;
+# BuildKit cache mounts persist Bun's install cache between image builds.
 FROM alpine:3.24
 
-# Only git, curl (to fetch the static Bun), and elfutils (to verify the output
-# binary) are needed. The build runs entirely on the supplied Bun: `bun install`
+# Elfutils (to verify the output binary) is needed. The build runs entirely on
+# the supplied Bun: `bun install`
 # for dependencies, `bun run` for every workspace build step and helper script
 # (`bun scripts/*.mjs|.ts`, `bun run copy-assets`, and tsgo via bun). No Node
 # runtime and no npm are present. No dependency lifecycle scripts run.
-RUN apk add --no-cache git curl elfutils
+RUN apk add --no-cache elfutils
 
 WORKDIR /app
 COPY . .
@@ -33,17 +33,27 @@ COPY . .
 # runs, so the value lands in dist regardless of whether git is available.
 ARG PI_SOURCE_SHA=unknown
 ENV PI_SOURCE_SHA=${PI_SOURCE_SHA}
+ARG PI_RUNTIME_SHA=unknown
+ENV PI_RUNTIME_SHA=${PI_RUNTIME_SHA}
 
 # Install the static ARM64 Bun first: the same Bun that compiles the standalone
 # binary also installs dependencies and drives the workspace build below.
 ARG BUN_MUSL_URL=https://github.com/joshuarli/bun-musl-static/releases/download/bun-5bf1172b-arm64-static-musl-llvm22/bun
-RUN curl -fsSL -o /usr/local/bin/bun "$BUN_MUSL_URL" \
-    && chmod +x /usr/local/bin/bun
+ARG BUN_MUSL_SHA256=fe6051fae1ba872d042f84d958c3b8df48346361797b6c5fa1cf18013d1eaf7e
+ADD ${BUN_MUSL_URL} /usr/local/bin/bun
+RUN echo "${BUN_MUSL_SHA256}  /usr/local/bin/bun" | sha256sum -c - \
+    && chmod +x /usr/local/bin/bun \
+    && ln -s /usr/local/bin/bun /usr/local/bin/node
 
 # Install workspace dependencies with Bun (frozen: the checked-in bun.lock) and
 # build all packages offline.
-RUN bun install --frozen-lockfile --ignore-scripts \
-    && bun run build:offline
+RUN --mount=type=cache,id=pi-bun-install,target=/root/.bun/install/cache \
+    export PI_RUNTIME_VERSION="bun $(bun --version)" \
+  && bun install --ignore-scripts \
+  && cd packages/ai \
+  && bun run hydrate-model-data \
+  && cd ../.. \
+  && bun run build:offline
 
 # Build the standalone binary natively (no --target: the container platform is
 # the target platform). The elfutils linkage check fails the build when the

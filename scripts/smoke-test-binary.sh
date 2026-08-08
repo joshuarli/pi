@@ -43,21 +43,21 @@ fail() {
 
 echo "==> smoke-test: $NAME ($(basename "$BIN"))"
 
-VERSION_OUT="$(cd "$WORK" && "$BIN" --version)" || fail "--version exited non-zero"
-# --version reports "pi <semver> (<source sha>) <runtime>"; extract the semver.
+VERSION_OUT="$(cd "$WORK" && "$BIN" -v)" || fail "-v exited non-zero"
+# -v reports "pi <semver> (<source sha>) <runtime>"; extract the semver.
 VERSION="$(printf '%s' "$VERSION_OUT" | sed -E 's/^pi ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "--version output '$VERSION_OUT' is not a semver"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "-v output '$VERSION_OUT' is not a semver"
 
 # Second run exercises the cache-reuse path (same TMPDIR).
 ( cd "$WORK" && "$BIN" --help >/dev/null 2>&1 ) || fail "--help exited non-zero"
 
-mapfile -t CACHE_DIRS < <(find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' | sort)
-if [ "${#CACHE_DIRS[@]}" -ne 1 ]; then
+cache_count="$(find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' | wc -l | tr -d ' ')"
+if [ "$cache_count" -ne 1 ]; then
 	echo "FAIL: expected exactly one extracted cache dir under TMPDIR; found:" >&2
-	printf '  %s\n' "${CACHE_DIRS[@]}" >&2
+	find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' -print | sort | sed 's/^/  /' >&2
 	exit 1
 fi
-CACHE_DIR="${CACHE_DIRS[0]}"
+CACHE_DIR="$(find "$TMPDIR" -maxdepth 1 -type d -name 'pi-embedded-*' -print -quit)"
 
 test -f "$CACHE_DIR/.complete" || fail "missing $CACHE_DIR/.complete marker"
 
@@ -68,7 +68,8 @@ for d in theme export-html docs examples; do
 	test -d "$CACHE_DIR/$d" || fail "missing $CACHE_DIR/$d/"
 done
 
-PKG_VERSION="$(node -e 'const p = require(process.argv[1]); process.stdout.write(p.version)' "$CACHE_DIR/package.json")"
+PKG_VERSION="$(PI_SMOKE_PACKAGE_JSON="$CACHE_DIR/package.json" \
+	node -e 'const p = require(process.env.PI_SMOKE_PACKAGE_JSON); process.stdout.write(p.version)')"
 [ "$PKG_VERSION" = "$VERSION" ] || fail "binary version '$VERSION' != extracted package.json version '$PKG_VERSION'"
 
 # Isolation: extraction must not leak into the working directory.

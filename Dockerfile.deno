@@ -1,0 +1,56 @@
+# Builder image for a static Linux MUSL pi-deno binary. The release Deno
+# executable is supplied as the named BuildKit context `deno-bin`; it owns
+# dependency installation, workspace builds, and the final `deno compile`.
+FROM alpine:3.24
+
+RUN apk add --no-cache binutils
+
+WORKDIR /app
+COPY . .
+
+COPY --from=deno-bin deno /usr/local/bin/deno
+COPY --from=deno-bin denort /usr/local/bin/denort
+RUN chmod 0755 /usr/local/bin/deno
+RUN chmod 0755 /usr/local/bin/denort
+
+# The source archive excludes .git, so pass the source identity explicitly to
+# the coding-agent version generator instead of probing git during the image
+# build.
+ARG PI_SOURCE_SHA=unknown
+ENV PI_SOURCE_SHA=${PI_SOURCE_SHA}
+ARG PI_RUNTIME_SHA=unknown
+ENV PI_RUNTIME_SHA=${PI_RUNTIME_SHA}
+
+# Provider model data is intentionally ignored by git, so hydrate it inside
+# the image before the remaining workspace build runs offline.
+RUN rm -rf packages/ai/src/providers/data
+
+RUN --mount=type=cache,id=pi-deno-install,target=/root/.cache/deno \
+    deno_version_output="$(deno --version)" \
+  && export PI_RUNTIME_VERSION="$(printf '%s\n' "$deno_version_output" | awk 'NR == 1 { print ($1 == "deno" ? $2 : $1); exit }')" \
+  && deno_runtime_sha="$(printf '%s\n' "$deno_version_output" | grep -Eo '\([0-9a-fA-F]{7,40}\)' | tr -d '()' | head -n 1)" \
+  && test -z "$deno_runtime_sha" || export PI_RUNTIME_SHA="$deno_runtime_sha" \
+  && deno install --node-modules-dir=auto \
+  && deno run --allow-all scripts/build-deno-workspace.mjs
+
+# Bundle from the Deno-specific entrypoint outside the package ancestry so the
+# compiler does not recursively embed the workspace node_modules tree.
+RUN deno run --allow-all node_modules/.bin/esbuild packages/coding-agent/dist/deno/cli.js \
+    --bundle \
+    --platform=node \
+    --format=esm \
+    --main-fields=module,main \
+    --banner:js='import { createRequire as __piDenoCreateRequire } from "node:module"; const require = __piDenoCreateRequire(import.meta.url);' \
+    --outfile=/tmp/pi-deno-bundle.js
+
+RUN deno run --allow-all scripts/prepare-deno-bundle.mjs \
+    /tmp/pi-deno-bundle.js /tmp/pi-deno-bundle.cjs \
+  && DENORT_BIN=/usr/local/bin/denort deno compile --no-check --allow-all \
+    --engine quickjs --output /app/pi-deno /tmp/pi-deno-bundle.cjs \
+  && readelf -lW /app/pi-deno \
+  && readelf -dW /app/pi-deno \
+  && test -z "$(readelf -lW /app/pi-deno | awk '/INTERP/{print}')" \
+  && test -z "$(readelf -dW /app/pi-deno | awk '/NEEDED/{print}')" \
+  && /app/pi-deno --version
+
+CMD ["sh", "-ec", "cp /app/pi-deno /artifacts/pi-deno && chmod +x /artifacts/pi-deno"]
