@@ -41,6 +41,9 @@ Deno:
 - Deno build metadata derives `RUNTIME_SHA` from the compiler's `deno --version`
   output; the compiler obtains the commit identity from its adjacent matching
   `denort`, rather than copying the Makefile's release pin.
+- The matching QuickJS runtime forwards `--version` to compiled applications;
+  `pi --version` therefore reports pi's version and source SHA, while bare
+  `denort --version` remains available for compiler/runtime matching.
 - `make deno-test` runs the embedded-assets/cache smoke for staged pi-deno.
 - `deno desktop` validation is out of scope.
 

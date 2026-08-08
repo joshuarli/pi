@@ -236,10 +236,10 @@ deno-fetch-linux-x86_64:
 # Build pi-deno natively on macOS 26+ arm64. Unlike the Linux target, this
 # intentionally uses the normal macOS dynamic system libraries and does not
 # use musl, static-linking checks, or the musl allocator. QuickJS Deno reserves
-# --version for the embedded runtime, so the recipe and smoke test use pi's -v
-# handler.
+# --version for the bare runtime, so the compiled app must receive --version
+# after the runtime has confirmed it is a standalone application.
 deno-macos-aarch64: export PI_RUNTIME_SHA=$(DENO_MACOS_RUNTIME_SHA)
-deno-macos-aarch64: export PI_RUNTIME_VERSION=$(DENO_MACOS_RUNTIME_VERSION)
+deno-macos-aarch64: export PI_RUNTIME_VERSION=deno $(DENO_MACOS_RUNTIME_VERSION)
 deno-macos-aarch64: deno-fetch-macos-aarch64 build
 	@test "$(OS_NAME)" = darwin || { echo "macOS targets require macOS 26 or newer" >&2; exit 1; }
 	@test "$(OS_ARCH)" = arm64 || { echo "macOS targets require an arm64 host" >&2; exit 1; }
@@ -267,7 +267,7 @@ deno-macos-aarch64: deno-fetch-macos-aarch64 build
 	cp "$$tmp/pi-deno" "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
 	chmod +x "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
 	file "$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)"; \
-	"$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)" -v
+	"$(OUT_DIR)/$(DENO_MACOS_ARTIFACT)" --version
 	@$(MAKE) --no-print-directory deno-macos-aarch64-test \
 		DENO_MACOS_ARTIFACT="$(DENO_MACOS_ARTIFACT)" OUT_DIR="$(OUT_DIR)"
 

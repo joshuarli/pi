@@ -27,7 +27,7 @@ RUN rm -rf packages/ai/src/providers/data
 
 RUN --mount=type=cache,id=pi-deno-install,target=/root/.cache/deno \
     deno_version_output="$(deno --version)" \
-  && export PI_RUNTIME_VERSION="$(printf '%s\n' "$deno_version_output" | awk 'NR == 1 { print ($1 == "deno" ? $2 : $1); exit }')" \
+  && export PI_RUNTIME_VERSION="deno $(printf '%s\n' "$deno_version_output" | awk 'NR == 1 { print ($1 == "deno" ? $2 : $1); exit }')" \
   && deno_runtime_sha="$(printf '%s\n' "$deno_version_output" | grep -Eo '\([0-9a-fA-F]{7,40}\)' | tr -d '()' | head -n 1)" \
   && test -z "$deno_runtime_sha" || export PI_RUNTIME_SHA="$deno_runtime_sha" \
   && deno install --node-modules-dir=auto \
