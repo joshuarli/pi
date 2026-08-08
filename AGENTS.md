@@ -57,10 +57,12 @@ compatibility layer. The macOS target uses the native system libraries instead.
 The single `.github/workflows/build-pi.yml` workflow is manual-only and uses
 first-party artifact actions plus shell, Docker, and `gh`. It downloads the
 Deno prerelease selected by the full `deno_sha` input, builds Linux in Docker
-on `ubuntu-24.04-arm` and macOS natively on `macos-26`, then publishes one
-prerelease containing all active pi archives. Bun inputs and commented matrix
+on `ubuntu-24.04-arm`/`ubuntu-24.04` and macOS natively on `macos-26`, then
+publishes one prerelease containing all active pi archives. Bun inputs and commented matrix
 entries remain documented there for later re-enablement, but Bun builds are
-currently disabled while its LLVM issue is investigated.
+currently disabled while its LLVM issue is investigated. Linux Deno builds use
+per-platform Docker BuildKit GHA cache scopes; the native macOS build uses a
+lockfile-keyed `node_modules` cache.
 
 The old `.github/workflows/build.yml` is intentionally absent. The pinned Deno
 prerelease `prerelease-5ea581da3280cd5321c4a2ee6c761466a37d3bc6` publishes these

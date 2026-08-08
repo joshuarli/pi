@@ -13,6 +13,7 @@ on:
         default: a9644683f1243a7c22969056be38b616218956e3
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -34,7 +35,7 @@ jobs:
             artifact_suffix: linux-arm64-musl-static
             upload_name: pi-deno-linux-arm64-musl
           - name: linux-amd64-musl-deno
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04
             kind: deno
             compiler_asset: deno-quickjs-x86_64-unknown-linux-musl
             runtime_asset: denort-quickjs-x86_64-unknown-linux-musl
@@ -86,6 +87,27 @@ jobs:
           git -C "$GITHUB_WORKSPACE" fetch --depth 1 origin "$GITHUB_SHA"
           git -C "$GITHUB_WORKSPACE" checkout --detach FETCH_HEAD
 
+      - name: Install Bun for native macOS build
+        if: matrix.runner == 'macos-26'
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_script="$RUNNER_TEMP/install-bun.sh"
+          curl --fail --location --retry 3 https://bun.sh/install -o "$install_script"
+          BUN_INSTALL="$RUNNER_TEMP/bun" bash "$install_script"
+          echo "$RUNNER_TEMP/bun/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bun/bin/bun" --version
+
+      - name: Restore macOS node_modules cache
+        id: macos_node_modules_cache
+        if: matrix.runner == 'macos-26'
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/**/node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
       - name: Build and smoke-test ${{ matrix.name }}
         shell: bash
         env:
@@ -132,10 +154,20 @@ jobs:
 
             cd "$GITHUB_WORKSPACE"
             if [ "${{ matrix.runner }}" = macos-26 ]; then
+              # The native macOS build uses the checked-out npm workspace
+              # directly. Reuse the exact-lockfile node_modules cache when it
+              # is available; the cache action saves a populated tree after a
+              # miss for the next macOS run.
+              if [ "${{ steps.macos_node_modules_cache.outputs.cache-hit }}" = true ]; then
+                skip_install=1
+              else
+                skip_install=0
+              fi
               make "${{ matrix.make_target }}" \
                 DENO_MACOS_BIN="$compiler_dir/deno" \
                 DENO_MACOS_RT_BIN="$compiler_dir/denort" \
                 DENO_MACOS_ARTIFACT="$artifact_name" \
+                SKIP_INSTALL="$skip_install" \
                 OUT_DIR="$artifact_dir"
             else
               make "${{ matrix.make_target }}" \
@@ -143,6 +175,7 @@ jobs:
                 DENO_RT_BIN="$compiler_dir/denort" \
                 DENO_LINUX_PLATFORM="${{ matrix.docker_platform }}" \
                 DENO_MUSL_ARTIFACT="$artifact_name" \
+                DOCKER_BUILD_CACHE_ARGS="--cache-from type=gha,scope=pi-deno-${{ matrix.name }} --cache-to type=gha,mode=max,scope=pi-deno-${{ matrix.name }}" \
                 OUT_DIR="$artifact_dir"
             fi
           else
