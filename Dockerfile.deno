@@ -1,20 +1,12 @@
-# Builder image for the static ARM64 MUSL pi-deno binary. The release Deno
-# executable is supplied as the named BuildKit context `deno-bin`; it is the
-# compiler and runtime used for the final `deno compile` step. Bun is used for
-# all workspace orchestration, matching Dockerfile.bun.
+# Builder image for a static Linux MUSL pi-deno binary. The release Deno
+# executable is supplied as the named BuildKit context `deno-bin`; it owns
+# dependency installation, workspace builds, and the final `deno compile`.
 FROM alpine:3.24
 
 RUN apk add --no-cache binutils
 
 WORKDIR /app
 COPY . .
-
-ARG BUN_MUSL_URL=https://github.com/joshuarli/bun-musl-static/releases/download/bun-5bf1172b-arm64-static-musl-llvm22/bun
-ARG BUN_MUSL_SHA256=fe6051fae1ba872d042f84d958c3b8df48346361797b6c5fa1cf18013d1eaf7e
-ADD ${BUN_MUSL_URL} /usr/local/bin/bun
-RUN echo "${BUN_MUSL_SHA256}  /usr/local/bin/bun" | sha256sum -c - \
-  && chmod 0755 /usr/local/bin/bun \
-  && ln -s /usr/local/bin/bun /usr/local/bin/node
 
 COPY --from=deno-bin deno /usr/local/bin/deno
 COPY --from=deno-bin denort /usr/local/bin/denort
@@ -31,17 +23,19 @@ ENV PI_RUNTIME_SHA=${PI_RUNTIME_SHA}
 
 # Provider model data is intentionally ignored by git, so hydrate it inside
 # the image before the remaining workspace build runs offline.
-RUN --mount=type=cache,id=pi-deno-bun-install,target=/root/.bun/install/cache \
-    export PI_RUNTIME_VERSION="$(deno --version | sed -n '1p')" \
-  && bun install --ignore-scripts \
-  && cd packages/ai \
-  && bun run hydrate-model-data \
-  && cd ../.. \
-  && bun run build:offline
+RUN rm -rf packages/ai/src/providers/data
+
+RUN --mount=type=cache,id=pi-deno-install,target=/root/.cache/deno \
+    deno_version_output="$(deno --version)" \
+  && export PI_RUNTIME_VERSION="$(printf '%s\n' "$deno_version_output" | awk 'NR == 1 { print ($1 == "deno" ? $2 : $1); exit }')" \
+  && deno_runtime_sha="$(printf '%s\n' "$deno_version_output" | grep -Eo '\([0-9a-fA-F]{7,40}\)' | tr -d '()' | head -n 1)" \
+  && test -z "$deno_runtime_sha" || export PI_RUNTIME_SHA="$deno_runtime_sha" \
+  && deno install --node-modules-dir=auto \
+  && deno run --allow-all scripts/build-deno-workspace.mjs
 
 # Bundle from the Deno-specific entrypoint outside the package ancestry so the
 # compiler does not recursively embed the workspace node_modules tree.
-RUN node_modules/.bin/esbuild packages/coding-agent/dist/deno/cli.js \
+RUN deno run --allow-all node_modules/.bin/esbuild packages/coding-agent/dist/deno/cli.js \
     --bundle \
     --platform=node \
     --format=esm \
@@ -49,7 +43,7 @@ RUN node_modules/.bin/esbuild packages/coding-agent/dist/deno/cli.js \
     --banner:js='import { createRequire as __piDenoCreateRequire } from "node:module"; const require = __piDenoCreateRequire(import.meta.url);' \
     --outfile=/tmp/pi-deno-bundle.js
 
-RUN bun scripts/prepare-deno-bundle.mjs \
+RUN deno run --allow-all scripts/prepare-deno-bundle.mjs \
     /tmp/pi-deno-bundle.js /tmp/pi-deno-bundle.cjs \
   && DENORT_BIN=/usr/local/bin/denort deno compile --no-check --allow-all \
     --engine quickjs --output /app/pi-deno /tmp/pi-deno-bundle.cjs \

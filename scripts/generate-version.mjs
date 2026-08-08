@@ -35,7 +35,7 @@ const sha = /^[0-9a-f]+$/i.test(raw) ? raw : "unknown";
 const runtimeVersion =
 	process.env.PI_RUNTIME_VERSION ||
 	(process.versions.bun ? `bun ${process.versions.bun}` : process.versions.deno ? `deno ${process.versions.deno}` : `node ${process.versions.node || "unknown"}`);
-const runtimeSha = /^[0-9a-f]{40}$/i.test(process.env.PI_RUNTIME_SHA || "") ? process.env.PI_RUNTIME_SHA : "unknown";
+const runtimeSha = /^[0-9a-f]{7,40}$/i.test(process.env.PI_RUNTIME_SHA || "") ? process.env.PI_RUNTIME_SHA : "unknown";
 
 writeFileSync(
 	outputPath,

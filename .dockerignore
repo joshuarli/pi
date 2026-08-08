@@ -1,9 +1,10 @@
-# Docker build context for Dockerfile.bun. Keep the context small and exclude
-# host build output; the container rebuilds everything from source.
+# Docker build context for the standalone Bun and Deno images. Keep the context
+# small and exclude host build output; the container rebuilds everything from source.
 .git
 node_modules
 **/node_modules
 **/dist
+.artifacts
 packages/coding-agent/binaries
 **/.pi
 *.log

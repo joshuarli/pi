@@ -6,7 +6,7 @@ on:
       deno_sha:
         description: Full Deno commit SHA whose prerelease archives should be downloaded
         required: true
-        default: ae3a64b9ad9e4a9f6341edf537c46245c62b4cfb
+        default: 671a92517269d0191d031c5476bdb03ae53d5c78
       bun_sha:
         description: Full Bun commit SHA whose prerelease asset should be downloaded when Bun builds are re-enabled
         required: false
@@ -28,15 +28,32 @@ jobs:
             deno_release_suffix: linux-musl-static
             compiler_asset: deno-quickjs-aarch64-unknown-linux-musl
             runtime_asset: denort-quickjs-aarch64-unknown-linux-musl
+            compiler_sha256: 3c9a27c192dcf6a015a9ea68153583e13fd97db6c54df854641909444464298c
+            runtime_sha256: a93e2e5c4af455db03c78513a5ec83b210d772398cb468f922b00382362a67ba
             make_target: deno-linux-arm64-musl
+            docker_platform: linux/arm64
             artifact_suffix: linux-arm64-musl-static
             upload_name: pi-deno-linux-arm64-musl
+          - name: linux-amd64-musl-deno
+            runner: ubuntu-24.04-arm
+            kind: deno
+            deno_release_suffix: linux-musl-static
+            compiler_asset: deno-quickjs-x86_64-unknown-linux-musl
+            runtime_asset: denort-quickjs-x86_64-unknown-linux-musl
+            compiler_sha256: 9436c1d3f92ac97d600cb1c8eb1d20c2611a0896a75fdefc8f0f6e6a1556152d
+            runtime_sha256: 80c20f06bdf4120ff2763d69f6e86a43a9424fec1d773a7800aea649e812d9ea
+            make_target: deno-linux-x86_64-musl
+            docker_platform: linux/amd64
+            artifact_suffix: linux-amd64-musl-static
+            upload_name: pi-deno-linux-amd64-musl
           - name: macos-arm64-deno
             runner: macos-26
             kind: deno
             deno_release_suffix: linux-musl-static
             compiler_asset: deno-quickjs-aarch64-apple-darwin
             runtime_asset: denort-quickjs-aarch64-apple-darwin
+            compiler_sha256: 228cbbf86d7de0884660eada6b6e269db6656006d2c96e77ef6815b9e3cfc74c
+            runtime_sha256: 81134a1ef922719acf3908bef895202ccac5d39cd2e60a4ae8a427ca315abeb2
             make_target: deno-macos-aarch64
             artifact_suffix: macos-arm64
             upload_name: pi-deno-macos-arm64
@@ -62,11 +79,6 @@ jobs:
       DENO_SHA: ${{ inputs.deno_sha }}
       BUN_RELEASE_REPOSITORY: joshuarli/bun-musl-static
       BUN_SHA: ${{ inputs.bun_sha }}
-      # These checksums are for the pinned Deno release above. Update them
-      # together with the workflow input default when moving to another release.
-      DENO_COMPILER_SHA256: 5258fae19edc0570506e6cbfa9c0c26a510cd687795ba54129da554607dd9349
-      DENO_RUNTIME_SHA256: 0d60fc9495a8b7c25a5eb483cc7052486aaa77a2dd12612488ad8dc489847f2a
-
     steps:
       - name: Check out the workflow commit
         shell: bash
@@ -105,10 +117,18 @@ jobs:
               -H "Authorization: Bearer $GH_TOKEN" \
               -o "$runtime_archive" \
               "$release_url/${{ matrix.runtime_asset }}.zip"
-            if [ "${{ matrix.runner }}" = ubuntu-24.04-arm ]; then
-              echo "$DENO_COMPILER_SHA256  $compiler_archive" | sha256sum --check --status -
-              echo "$DENO_RUNTIME_SHA256  $runtime_archive" | sha256sum --check --status -
-            fi
+            verify_sha256() {
+              expected="$1"
+              file="$2"
+              if command -v sha256sum >/dev/null 2>&1; then
+                actual="$(sha256sum "$file" | awk '{print $1}')"
+              else
+                actual="$(shasum -a 256 "$file" | awk '{print $1}')"
+              fi
+              test "$actual" = "$expected"
+            }
+            verify_sha256 "${{ matrix.compiler_sha256 }}" "$compiler_archive"
+            verify_sha256 "${{ matrix.runtime_sha256 }}" "$runtime_archive"
             unzip -p "$compiler_archive" "${{ matrix.compiler_asset }}" > "$compiler_dir/deno"
             unzip -p "$runtime_archive" "${{ matrix.runtime_asset }}" > "$compiler_dir/denort"
             chmod 0755 "$compiler_dir/deno" "$compiler_dir/denort"
@@ -119,13 +139,12 @@ jobs:
                 DENO_MACOS_BIN="$compiler_dir/deno" \
                 DENO_MACOS_RT_BIN="$compiler_dir/denort" \
                 DENO_MACOS_ARTIFACT="$artifact_name" \
-                DENO_RUNTIME_SHA="$DENO_SHA" \
                 OUT_DIR="$artifact_dir"
             else
               make "${{ matrix.make_target }}" \
                 DENO_BIN="$compiler_dir/deno" \
                 DENO_RT_BIN="$compiler_dir/denort" \
-                DENO_RUNTIME_SHA="$DENO_SHA" \
+                DENO_LINUX_PLATFORM="${{ matrix.docker_platform }}" \
                 DENO_MUSL_ARTIFACT="$artifact_name" \
                 OUT_DIR="$artifact_dir"
             fi
@@ -156,7 +175,7 @@ jobs:
           artifact="$artifact_dir/$artifact_name"
           test -x "$artifact"
           file "$artifact"
-          if [ "${{ matrix.kind }}" = deno ] && [ "${{ matrix.runner }}" = ubuntu-24.04-arm ]; then
+          if [ "${{ matrix.kind }}" = deno ] && [ "${{ matrix.name }}" != macos-arm64-deno ]; then
             test -z "$(readelf -lW "$artifact" | awk '/INTERP/{print}')"
             test -z "$(readelf -dW "$artifact" | awk '/NEEDED/{print}')"
           fi
@@ -197,6 +216,7 @@ jobs:
 
           expected_deno_assets=(
             "pi-${GITHUB_SHA}-deno-${DENO_SHA}-linux-arm64-musl-static.zip"
+            "pi-${GITHUB_SHA}-deno-${DENO_SHA}-linux-amd64-musl-static.zip"
             "pi-${GITHUB_SHA}-deno-${DENO_SHA}-macos-arm64.zip"
           )
           for expected_asset in "${expected_deno_assets[@]}"; do
@@ -208,7 +228,7 @@ jobs:
             release_files+=("$release_file")
             unzip -tq "$release_file"
           done < <(find artifacts -type f -name '*.zip' -print0 | sort -z)
-          test "${#release_files[@]}" -ge 2
+          test "${#release_files[@]}" -ge 3
 
           release_name="pi-${GITHUB_SHA}"
           gh release create "$release_name" \

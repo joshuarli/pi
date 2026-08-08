@@ -30,20 +30,27 @@ Bun:
 
 Deno:
 
-- `make deno-linux-arm64-musl DENO_BIN=/path/to/deno DENO_RT_BIN=/path/to/denort`
-  builds pi-deno with a matching static QuickJS Deno compiler/runtime pair.
+- `make deno-linux-arm64-musl` builds pi-deno with the pinned static QuickJS
+  Deno compiler/runtime pair, downloading it into `.artifacts/` when no paths
+  are supplied. Override `DENO_BIN` and `DENO_RT_BIN` to use another matching
+  pair.
+- `make deno-linux-x86_64-musl` (or `make deno-linux-amd64-musl`) builds the
+  matching Linux AMD64 artifact through Docker's `linux/amd64` platform.
 - `make deno-macos-aarch64` builds pi-deno natively on macOS 26+ arm64 using
-  the sibling `deno-musl-static` checkout's optimized `release-quickjs`
-  compiler/runtime pair by default.
+  the pinned prebuilt macOS QuickJS compiler/runtime pair by default.
+- Deno build metadata derives `RUNTIME_SHA` from the compiler's `deno --version`
+  output; the compiler obtains the commit identity from its adjacent matching
+  `denort`, rather than copying the Makefile's release pin.
 - `make deno-test` runs the embedded-assets/cache smoke for staged pi-deno.
 - `deno desktop` validation is out of scope.
 
-The Deno Docker build bundles the Deno-specific coding-agent entrypoint with
-esbuild, prepares a CommonJS bundle for QuickJS Deno compilation, and verifies
+The Deno Docker build uses Deno to install dependencies, build the workspace,
+hydrate model data, bundle the Deno-specific coding-agent entrypoint with
+esbuild, prepare a CommonJS bundle for QuickJS Deno compilation, and verify
 that the resulting ELF has no interpreter or dynamic dependencies. Linux
-builders run natively as `linux/arm64` Docker containers; do not substitute a
-glibc binary or a cross-libc compatibility layer. The macOS target uses the
-native system libraries instead.
+builders run as `linux/arm64` and `linux/amd64` Docker containers (including
+QEMU emulation where needed); do not substitute a glibc binary or a cross-libc
+compatibility layer. The macOS target uses the native system libraries instead.
 
 ## Release workflows
 
@@ -61,6 +68,10 @@ workflow publishes these compiler/runtime archives:
 ```text
 deno-quickjs-aarch64-unknown-linux-musl.zip
 denort-quickjs-aarch64-unknown-linux-musl.zip
+deno-quickjs-x86_64-unknown-linux-musl.zip
+denort-quickjs-x86_64-unknown-linux-musl.zip
+deno-quickjs-aarch64-apple-darwin.zip
+denort-quickjs-aarch64-apple-darwin.zip
 ```
 
 ## Validation rules
